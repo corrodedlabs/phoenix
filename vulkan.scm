@@ -1,10 +1,29 @@
 (define vulkan (load-shared-object "libvulkan.so"))
 
+;; (define sample (load-shared-object "./sample.so"))
+
 (define-condition-type &ffi-condition &condition
   ffi-condition ffi-condition?
   (msg ffi-condition-msg)
   (ptr ffi-condition-ptr)
   (context ffi-condition-context))
+
+(define strdup (foreign-procedure "strdup" (string) (* char)))
+
+(define-syntax write-cstring
+  (syntax-rules ()
+    ((_ ptr ftype field-accessor str)
+     (ftype-set! ftype field-accessor ptr (strdup str)))))
+
+(define ptr->string
+  (lambda (ptr)
+    (let loop ((i 0)
+	       (chs '()))
+      (let ((ch (foreign-ref 'char (ftype-pointer-address ptr) i)))
+	 (cond
+	  ((char=? ch #\nul) (list->string (reverse chs)))
+	  (else (loop (+ i 1)
+		      (cons ch chs))))))))
 
 
 (define-syntax make-foreign-object
@@ -18,7 +37,10 @@
        (lambda (obj)
 	 (cond
 	  ((ftype-pointer? struct-name obj)
-	   (f struct-name (member-name) obj))
+	   (let ((value (f struct-name (member-name) obj)))
+	     (if (ftype-pointer? char value)
+	       (ptr->string value)
+	       value)))
 	  (else (raise (ffi-condition "invalid pointer" obj lambda-name)))))))))
 
 
@@ -45,12 +67,16 @@
 				(with-syntax ([val-expr (construct-name #'struct-name
 									"val-"
 									#'name)])
-				  (cons #'(ftype-set! struct-name (name) obj val-expr)
+				  (cons #'(cond
+					   ((string? val-expr)
+					    (write-cstring obj struct-name (name) val-expr))
+					   (else (ftype-set! struct-name (name) obj val-expr)))
 					#'val-expr))))
 			    member-spec)])
 	  #'(lambda (val-exprs ...)
 	      (let ((obj (make-foreign-object struct-name)))
-		(begin setters ...))))))
+		setters ...
+		obj)))))
 
     (define construct-val-defs
       (lambda (struct-name member-names)
@@ -81,12 +107,27 @@
 	     val-defs ...))])))
 
 (define-ftype vk-structure-type int)
+(define-ftype cstring (* char))
+
+(define-foreign-struct abc
+  ((a . int)
+   (d . cstring)))
 
 (define-foreign-struct vk-application-info
   [(sType . vk-structure-type)
    (next . uptr)
-   (application-name . (* char))
+   (application-name . cstring)
    (application-version . int)
-   (engine-name . (* char))
+   (engine-name . cstring)
    (engine-version . int)
    (api-version . int)])
+
+;; (define a (make-abc 12 "world"))
+;; (abc-&d a)
+
+;; (read-cstring abc d a)
+
+;; (fill-vulkan-struct vk-application-info
+;; 		    ())
+
+;; (define app-info (make-vk-application-info ))
