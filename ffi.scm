@@ -1,11 +1,17 @@
 (library (ffi)
+  
   (export write-cstring
 	  ptr->string
+	  char**
+	  char**->strings
+	  read-int
 	  make-foreign-object
 	  define-foreign-struct
 	  define-enum-ftype)
 
   (import (chezscheme))
+
+  (define libc (load-shared-object "libc.so.6"))
   
   (define-condition-type &ffi-condition &condition
     ffi-condition ffi-condition?
@@ -25,15 +31,28 @@
     (let ((x (do-malloc size)))
       (malloc-guardian x)
       x))
-
-  (define libc (load-shared-object "libc.so.6"))
     
-  (define strcpy (foreign-procedure "strdup" (string) (* char)))
+  (define strdup (foreign-procedure "strdup" (string) (* char)))
 
   (define-syntax write-cstring
     (syntax-rules ()
       ((_ ptr ftype field-accessor str)
        (ftype-set! ftype field-accessor ptr (strdup str)))))
+
+  (define-ftype char** (* (* char)))
+
+  (define (char**->strings ptr count)
+    (let lp ((i 0)
+	     (strs '()))
+      (cond
+       ((< i count)
+	(lp (+ 1 i)
+	    (cons (ptr->string (ftype-ref char** (*) ptr i)) strs)))
+       (else strs))))
+
+  (define-syntax read-int
+    (syntax-rules ()
+      ((_ ptr) (ftype-ref int () ptr))))
 
 
   (define ptr->string
@@ -91,7 +110,7 @@
 				    (cons #'(cond
 					     ((string? val-expr)
 					      (write-cstring obj struct-name (name) val-expr))
-					     (else (ftype-set! struct-name (name) obj val-expr)))
+					     (val-expr (ftype-set! struct-name (name) obj val-expr)))
 					  #'val-expr))))
 			      member-spec)])
 	    #'(lambda (val-exprs ...)
