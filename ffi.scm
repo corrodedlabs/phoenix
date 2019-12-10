@@ -4,9 +4,8 @@
 	  ptr->string
 	  string->ptr
 	  strdup
-	  char**
-	  char**->strings
-	  strings->char**
+	  ptr->strings
+	  strings->ptr
 	  read-int
 	  malloc
 	  make-foreign-object
@@ -70,28 +69,35 @@
 	 (else (foreign-set! 'char ptr i (string-ref str i))
 	       (lp (+ 1 i)))))))
 
-  (define-ftype char** (* (* char)))
+  (define strings->ptr
+    (lambda (strs)
+      (let ((ptr (make-ftype-pointer uptr
+				     (unbox
+				      (malloc (* (ftype-sizeof uptr)
+						 (length strs)))))))
+	(let lp ((i 0)
+		 (s strs))
+	  (cond
+	   ((null? s) ptr)
+	   (else (ftype-set! uptr
+			     ()
+			     ptr
+			     i
+			     (ftype-pointer-address  (string->ptr (car s))))
+		 (lp (+ 1 i) (cdr s))))))))
 
-  (define (char**->strings ptr count)
-    (let lp ((i 0)
-	     (strs '()))
-      (cond
-       ((< i count)
-	(lp (+ 1 i)
-	    (cons (ptr->string (ftype-ref char** (i) ptr)) strs)))
-       (else strs))))
 
-  (define (strings->char** strs)
-    (let ((ptr (make-ftype-pointer uptr (unbox (malloc (* (ftype-sizeof char)
-							  (apply + (map (lambda (s)
-									  (+ 1 (string-length s)))
-									strs))))))))
+  (define ptr->strings
+    (lambda (ptr count)
       (let lp ((i 0)
-	       (s strs))
+	       (strs (list)))
 	(cond
-	 ((null? s) ptr)
-	 (else (begin (ftype-set! uptr () ptr i (strdup (car s)))
-		      (lp (+ 1 i) (cdr s))))))))
+	 ((= i count) (reverse strs))
+	 (else (lp (+ 1 i)
+		   (cons (ptr->string
+			  (make-ftype-pointer uptr
+					      (ftype-ref uptr () ptr i)))
+			 strs)))))))
 
   (define-syntax make-foreign-object
     (syntax-rules ()
@@ -204,6 +210,8 @@
 
 #!eof
 
+--------------------------------------------
+
 (load "ffi.scm")
 
 (import (ffi))
@@ -215,78 +223,28 @@
 
 (ptr->strings (make-ftype-pointer uptr (s)) 3)
 
-
-
 (define-foreign-struct abc
   ((a . int)
    (d . (* (* char)))))
 
 (define strs '("hello" "world"))
 
-(ftype-pointer-ftype (strings->char** strs))
-
-(ftype-sizeof char**)
-
-(strdup "abcd")
-
-(define o (make-abc 12 (strings->char** strs)))
-
-
---------------------------------------------
-
 (define a "hello")
 
 (define strs (list a "do it" "people" "iuyt"))
-;; (define strings->ptr
-;;   (lambda (strs)
-;;     (let ((ptr (make-ftype-pointer uptr
-;; 				   (unbox
-;; 				    (malloc (* (ftype-sizeof uptr)
-;; 					       (length strs)))))))
-;;       (let lp ((i 0)
-;; 	       (s strs))
-;; 	(cond
-;; 	 ((null? s) ptr)
-;; 	 (else (ftype-set! uptr () ptr i (string->ptr (car strs)))
-;; 	       (lp (+ 1 i) (cdr s))))))))
 
-(define strings->ptr
-  (lambda (strs)
-    (let ((ptr (unbox (malloc (* (ftype-sizeof uptr)
-				 (length strs))))))
-      (let lp ((i 0)
-	       (s strs))
-	(write i)
-	(write s)
-	(cond
-	 ((null? s) (make-ftype-pointer uptr ptr))
-	 (else (foreign-set! 'uptr ptr i (ftype-pointer-address (string->ptr (car s))))
-	       (lp (+ 1 i) (cdr s))))))))
-
+(ftype-pointer? uptr (string->ptr "abcd"))
 (strings->ptr strs)
-
-(define ptr->strings
-  (lambda (ptr count)
-    (let lp ((i 0)
-	     (strs (list)))
-      (cond
-       ((= i count) (reverse strs))
-       (else (lp (+ 1 i)
-		 (cons (ptr->string
-			(make-ftype-pointer uptr
-					    (ftype-ref uptr () ptr i)))
-		       strs)))))))
 
 (define a (cdr exts))
 
 (trace ptr->strings)
 (ptr->strings (strings->ptr strs) (length strs))
 
-(ptr->strings (cdr exts) 2)
-
+(import (glfw))
+(glfw-init)
 (define exts (glfw-get-required-instance-extensions))
 
-
-
+(ptr->strings (cdr exts) 2)
 
 (equal? a (ptr->string (string->ptr a)))
