@@ -14,7 +14,7 @@
 
   (define-ftype cstring (* char))
 
-  (trace-define-syntax define-vulkan-struct
+  (define-syntax define-vulkan-struct
     (syntax-rules ()
       ((_ struct-name ((member-name . member-type) ...))
        (define-foreign-struct struct-name
@@ -37,6 +37,11 @@
      (enabled-extension-count . int)
      (enabled-extension-names . (* char**))))
 
+
+  (define +validation-layer+ "VK_LAYER_KHRONOS_validation")
+  (define +validation-extension+ "VK_EXT_debug_utils")
+
+
   (define (make-vulkan-instance validation?)
     
     (define create-instance
@@ -56,6 +61,8 @@
   					       #x010000))
 	   (glfw-extensions-info (begin (glfw-init)
 					(glfw-get-required-instance-extensions)))
+	   (layers-info (cond
+			 ((validation? (cons 1 )))))
 	   (instance-info (make-vk-instance-create-info vk-structure-type-instance-create-info
 							0
 							0

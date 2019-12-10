@@ -11,13 +11,15 @@
   
   (define glfw-get-required-instance-extensions
     (lambda ()
-      (let ((f (foreign-procedure "glfwGetRequiredInstanceExtensions" ((* int)) (* char**))))
+      (let ((f (foreign-procedure "glfwGetRequiredInstanceExtensions" ((* int)) uptr)))
 	(let* ((num-extensions (make-foreign-object int))
 	       (extensions (f num-extensions)))
-	  (cons (read-int num-extensions) extensions))))))
+	  (cons (read-int num-extensions)
+		(make-ftype-pointer uptr extensions)))))))
 
 #|
 
+> (load "glfw.scm")
 > (import (glfw))
 
 > (glfw-init)
