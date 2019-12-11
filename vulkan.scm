@@ -23,9 +23,9 @@
 	  (member-name . member-type) ...]))))
 
   (define-vulkan-struct vk-application-info
-    ((application-name . cstring)
+    ((application-name . uptr)
      (application-version . int)
-     (engine-name . cstring)
+     (engine-name . uptr)
      (engine-version . int)
      (api-version . int)))
 
@@ -33,9 +33,9 @@
     ((flags . int)
      (application-info . (* vk-application-info))
      (enabled-layer-count . int)
-     (enabled-layer-names .  (* char**))
+     (enabled-layer-names .  uptr)
      (enabled-extension-count . int)
-     (enabled-extension-names . (* char**))))
+     (enabled-extension-names . uptr)))
 
 
   (define +validation-layer+ "VK_LAYER_KHRONOS_validation")
@@ -52,23 +52,54 @@
 	    ((0) instance)
 	    (else (raise "cannot create vulkan instance "))))))
 
+    ;;todo should strings->ptr just return the address instead of pointer?
+    (define get-required-extensions
+      (lambda ()
+	(let ((glfw-extensions-info (begin (glfw-init)
+					   (glfw-get-required-instance-extensions))))
+	  (cond
+	   (validation?  (let ((extensions (append (ptr->strings glfw-extensions-info)
+						   (list +validation-extension+))))
+			   (cons (length extensions)
+				 (ftype-pointer-address (strings->ptr extensions)))))
+	   (else glfw-extensions-info)))))
+
     (let* ((app-info (make-vk-application-info vk-structure-type-application-info
   					       0
-  					       "engine"
+					       "engine"
   					       #x010000
   					       "phoenix"
   					       #x010000
   					       #x010000))
-	   (glfw-extensions-info (begin (glfw-init)
-					(glfw-get-required-instance-extensions)))
+	   (extensions (get-required-extensions))
 	   (layers-info (cond
-			 ((validation? (cons 1 )))))
+			 (validation? (cons 1
+					    (ftype-pointer-address
+					     (strings->ptr (list +validation-layer+)))))
+			 (else (cons 0 #f))))
 	   (instance-info (make-vk-instance-create-info vk-structure-type-instance-create-info
 							0
 							0
 							app-info
-							0
-							#f
-							(car glfw-extensions-info)
-							(cdr glfw-extensions-info))))
+							(car layers-info)
+							(cdr layers-info)
+							(car extensions)
+							(cdr extensions))))
       (create-instance instance-info))))
+
+#|
+
+=====================================================================================
+
+(load "vulkan.scm")
+(import (ffi))
+(import (glfw))
+(import (vulkan))
+
+(define validation? #t)
+
+(make-vulkan-instance #f)
+
+(get-required-extensions)
+
+|#

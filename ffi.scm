@@ -35,18 +35,7 @@
       (let ((x (do-malloc size)))
 	(malloc-guardian x)
 	x)))
-    
-  (define strdup (foreign-procedure "strdup" (string) string))
-
-  (define-syntax write-cstring
-    (syntax-rules ()
-      ((_ ptr ftype field-accessor str)
-       (ftype-set! ftype field-accessor ptr (strdup str)))))
-
-  (define-syntax read-int
-    (syntax-rules ()
-      ((_ ptr) (ftype-ref int () ptr))))
-
+   
 
   (define ptr->string
     (lambda (ptr)
@@ -88,16 +77,35 @@
 
 
   (define ptr->strings
-    (lambda (ptr count)
-      (let lp ((i 0)
-	       (strs (list)))
-	(cond
-	 ((= i count) (reverse strs))
-	 (else (lp (+ 1 i)
-		   (cons (ptr->string
-			  (make-ftype-pointer uptr
-					      (ftype-ref uptr () ptr i)))
-			 strs)))))))
+    (case-lambda
+      ((ptr-info)
+       (ptr->strings (cdr ptr-info) (car ptr-info)))
+      ((ptr count)
+       (let ((ptr (cond
+		   ((ftype-pointer? ptr) ptr)
+		   (else (make-ftype-pointer uptr ptr)))))
+	 (let lp ((i 0)
+		  (strs (list)))
+	   (cond
+	    ((= i count) (reverse strs))
+	    (else (lp (+ 1 i)
+		      (cons (ptr->string
+			     (make-ftype-pointer uptr
+						 (ftype-ref uptr () ptr i)))
+			    strs)))))))))
+
+  
+  (define strdup (foreign-procedure "strdup" (string) string))
+
+  (define-syntax write-cstring
+    (syntax-rules ()
+      ((_ ptr ftype field-accessor str)
+       (ftype-set! ftype field-accessor ptr (ftype-pointer-address (string->ptr str))))))
+
+  (define-syntax read-int
+    (syntax-rules ()
+      ((_ ptr) (ftype-ref int () ptr))))
+
 
   (define-syntax make-foreign-object
     (syntax-rules ()
@@ -208,7 +216,7 @@
 				   (do-free x)
 				   (lp)))))))
 
-#!eof
+#|
 
 --------------------------------------------
 
@@ -247,4 +255,6 @@
 
 (ptr->strings (cdr exts) 2)
 
+(foreign-address-name (cdr exts))
 (equal? a (ptr->string (string->ptr a)))
+|#

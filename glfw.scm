@@ -15,7 +15,7 @@
 	(let* ((num-extensions (make-foreign-object int))
 	       (extensions (f num-extensions)))
 	  (cons (read-int num-extensions)
-		(make-ftype-pointer uptr extensions)))))))
+		extensions))))))
 
 #|
 
@@ -24,6 +24,6 @@
 
 > (glfw-init)
 
-> (glfw-get-required-instance-extensions)
+> (ptr->strings (glfw-get-required-instance-extensions))
 
 |#
