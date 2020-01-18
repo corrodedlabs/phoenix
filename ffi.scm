@@ -5,12 +5,17 @@
 	  string->ptr
 	  strdup
 	  ptr->strings
+	  strings->c-array
 	  strings->ptr
+	  
 	  read-int
+	  read-unsigned-32
+
 	  malloc
 	  make-foreign-object
 	  define-foreign-struct
-	  define-enum-ftype)
+	  define-enum-ftype
+	  cstring)
 
   (import (chezscheme))
 
@@ -35,28 +40,39 @@
       (let ((x (do-malloc size)))
 	(malloc-guardian x)
 	x)))
-   
+
+
+  
+  (define-ftype cstring (* char)) 
 
   (define ptr->string
     (lambda (ptr)
       (let loop ((i 0)
 		 (chs '()))
-	(let ((ch (foreign-ref 'char (ftype-pointer-address ptr) i)))
+	(let ((ch (foreign-ref 'char ptr i)))
 	  (cond
 	   ((char=? ch #\nul) (list->string (reverse chs)))
 	   (else (loop (+ i 1)
 		       (cons ch chs))))))))
 
-  (define (string->ptr str)
-    (let ((ptr (unbox (malloc (* (ftype-sizeof char)
-				 (string-length str))))))
-      (let lp ((i 0))
-	(cond
-	 ((= i (string-length str))
-	  (foreign-set! 'char ptr i #\nul)
-	  (make-ftype-pointer uptr ptr))
-	 (else (foreign-set! 'char ptr i (string-ref str i))
-	       (lp (+ 1 i)))))))
+  (define string->ptr
+    (case-lambda
+      [(str)
+       (string->ptr str (unbox (malloc (* (ftype-sizeof char)
+					  (string-length str)))) 0)]
+      [(str ptr)
+       (string->ptr str ptr 0)]
+      [(str ptr offset)
+       (let lp ((i offset))
+       	 (cond
+       	  ((= i (+ (string-length str) offset))
+       	   (foreign-set! 'char ptr i #\nul)
+	   ptr)
+       	  (else (foreign-set! 'char ptr i (string-ref str (- i offset)))
+       		(lp (+ 1 i)))))]))
+
+  ;; (string->ptr "abcd")
+
 
   (define strings->ptr
     (lambda (strs)
@@ -72,8 +88,29 @@
 			     ()
 			     ptr
 			     i
-			     (ftype-pointer-address  (string->ptr (car s))))
+			      (string->ptr (car s)))
 		 (lp (+ 1 i) (cdr s))))))))
+
+  (define strings->c-array
+    (lambda (strs)
+      (let ((ptr (unbox (malloc (* (ftype-sizeof char)
+  				   (apply +
+  				     (map (lambda (s) (+ 1 (string-length s)))
+  					  strs)))))))
+  	(let loop ((i 0)
+  		   (s strs))
+	  (write "loop daa:")
+	  (write i)
+	  (write s)
+	  (write "\n")
+  	  (cond
+  	   ((null? s) ptr)
+  	   (else (let ((len (string-length (car s))))
+		   (string->ptr (car s) ptr i)
+		   (loop (+ i len 1) (cdr s)))))))))
+
+  ;; (define strs (list "hello" "world"))
+  ;; (strings->c-array strs)
 
 
   (define ptr->strings
@@ -89,9 +126,7 @@
 	   (cond
 	    ((= i count) (reverse strs))
 	    (else (lp (+ 1 i)
-		      (cons (ptr->string
-			     (make-ftype-pointer uptr
-						 (ftype-ref uptr () ptr i)))
+		      (cons (ptr->string (ftype-ref uptr () ptr i))
 			    strs)))))))))
 
   
@@ -100,11 +135,15 @@
   (define-syntax write-cstring
     (syntax-rules ()
       ((_ ptr ftype field-accessor str)
-       (ftype-set! ftype field-accessor ptr (ftype-pointer-address (string->ptr str))))))
+       (ftype-set! ftype field-accessor ptr (string->ptr str)))))
 
   (define-syntax read-int
     (syntax-rules ()
       ((_ ptr) (ftype-ref int () ptr))))
+
+  (define-syntax read-unsigned-32
+    (syntax-rules ()
+      ((_ ptr) (ftype-ref unsigned-32 () ptr))))
 
 
   (define-syntax make-foreign-object
@@ -124,7 +163,7 @@
 		 value)))
 	    (else (raise (ffi-condition "invalid pointer" obj lambda-name)))))))))
 
-  (define-syntax define-foreign-struct
+  (trace-define-syntax define-foreign-struct
     (lambda (stx)
 
       (define construct-name
@@ -208,13 +247,14 @@
 	     (define e v) ...))]))
 
   ;; configure gc
-  (collect-request-handler (lambda ()
-			     (collect)
-			     (let lp ()
-			       (let ((x (malloc-guardian)))
-				 (when x
-				   (do-free x)
-				   (lp)))))))
+  ;; (collect-request-handler (lambda ()
+  ;; 			     (collect)
+  ;; 			     (let lp ()
+  ;; 			       (let ((x (malloc-guardian)))
+  ;; 				 (when x
+  ;; 				   (do-free x)
+  ;; 				   (lp))))))
+  )
 
 #|
 
@@ -242,18 +282,23 @@
 (define strs (list a "do it" "people" "iuyt"))
 
 (ftype-pointer? uptr (string->ptr "abcd"))
+
+;; convert to test
+(ptr->string (string->ptr "ancd"))
+
 (strings->ptr strs)
 
 (define a (cdr exts))
 
 (trace ptr->strings)
-(ptr->strings (strings->ptr strs) (length strs))
+(ptr->string (strings->c-array (ptr->strings (strings->ptr strs) (length strs))))
 
 (import (glfw))
 (glfw-init)
 (define exts (glfw-get-required-instance-extensions))
 
-(ptr->strings (cdr exts) 2)
+(ptr->strings  (strings->c-array (ptr->strings exts)))
+
 
 (foreign-address-name (cdr exts))
 (equal? a (ptr->string (string->ptr a)))
