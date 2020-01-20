@@ -38,6 +38,7 @@
 			     count
 			     0)
 
+(get-physical-devices instance)
 
 (trace-define-syntax define-enum-library
 		     (lambda (stx)

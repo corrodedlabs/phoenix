@@ -1,0 +1,3 @@
+[submodule "thunderchez"]
+	path = thunderchez
+	url = https://github.com/ovenpasta/thunderchez

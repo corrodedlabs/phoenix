@@ -5,4 +5,5 @@
 (define main
   (lambda ()
     (define instance (make-vulkan-instance #t))
-    (create-debug-utils-messenger instance)))
+    (define messenger (create-debug-utils-messenger instance))
+    (get-physical-devices instance)))
