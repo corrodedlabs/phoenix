@@ -1,3 +1,6 @@
 [submodule "thunderchez"]
 	path = thunderchez
 	url = https://github.com/ovenpasta/thunderchez
+[submodule "glfw"]
+	path = glfw
+	url = https://github.com/chenguangqi/glfw

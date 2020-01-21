@@ -158,8 +158,7 @@
 						  (string-append "_" command-string))))
 		       (ffi-proc (datum->syntax #'command
 						(string->symbol
-						 (string-drop
-						  (camel-case->kebab-case command-string) 3))))
+						 (camel-case->kebab-case command-string))))
 		       ((arg-names ...) (map (lambda (t) (datum->syntax #'command (gensym)))
 					   #'(argument-types ...))))
 	   #'(begin (define _ffi-proc
@@ -185,4 +184,4 @@
 
 (define v (load-shared-object "libvulkan.so.1"))
 
-(library-directories "./thunderchez")
+(library-directories '("./thunderchez" "."))
