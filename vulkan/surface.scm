@@ -44,3 +44,5 @@ experiments:
 
 
 (define window-obj (setup-window ins 1366 768))
+
+(window-details? window-obj)

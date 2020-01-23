@@ -144,7 +144,7 @@
 							    validation-message
 							    performance-message)
 						     cb
-						     #f))))
+						     0))))
     
     (let* ((messenger (make-foreign-object uptr))
 	   (proc-address (get-procedure-address instance "vkCreateDebugUtilsMessengerEXT"))

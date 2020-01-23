@@ -30,5 +30,5 @@
 
 
 (vk-queue-family-properties-queue-count
- (ftype-&ref vk-queue-family-properties () (cdr family-props-arr) 1))
+ (ftype-&ref vk-queue-family-properties () (cdr family-props-arr) 2))
 
