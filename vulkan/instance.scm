@@ -165,14 +165,4 @@
       (create-debug-utils-messenger instance)
       instance)))
 
-;; (define get-physical-devices
-;;   (lambda (instance)
-
-
-;;     (let ((count (make-foreign-object unsigned-32)))
-;;       (_enumerate-physical-devices instance count (make-ftype-pointer vk-physical-device 0))
-;;       (let ((devices (make-foreign-array vk-physical-device (read-unsigned-32 count))))
-;; 	(_enumerate-physical-devices instance count devices)
-;; 	devices))))
-
 

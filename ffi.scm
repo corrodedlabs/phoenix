@@ -21,6 +21,8 @@
   (import (chezscheme))
 
   (define libc (load-shared-object "libc.so.6"))
+
+  (meta define identity (lambda (x) x))
   
   (define-condition-type &ffi-condition &condition
     ffi-condition ffi-condition?
@@ -156,80 +158,201 @@
       ((_ struct size) (make-ftype-pointer struct (unbox (malloc (* size
 								    (ftype-sizeof struct))))))))
 
-  (define-syntax define-ptr-lambda 
-    (syntax-rules ()
-      ((_ lambda-name struct-name member-name f)
-       (define lambda-name
-	 (lambda (obj)
-	   (cond
-	    ((ftype-pointer? struct-name obj)
-	     (let ((value (f struct-name (member-name) obj)))
-	       (if (ftype-pointer? char value)
-		   (ptr->string value)
-		   value)))
-	    (else (raise (ffi-condition "invalid pointer" obj lambda-name)))))))))
+  (meta define-syntax define-ptr-lambda 
+	(syntax-rules ()
+	  ((_ lambda-name struct-name member-spec f)
+	   (define lambda-name
+	     (lambda (obj)
+	       (cond
+		((ftype-pointer? struct-name obj)
+		 (let ((value (f struct-name member-spec obj)))
+		   (if (ftype-pointer? char value)
+		       (ptr->string value)
+		       value)))
+		(else (raise (ffi-condition "invalid pointer" obj lambda-name)))))))))
+
+
+  (define-syntax with-syntax*
+    (lambda (stx)
+      (syntax-case stx (values)
+	((_ () body ...)
+	 #'(let-values () body ...))
+	((recur (((values . hd) e) . rest) body ...)
+	 #'(let-values ((hd e))
+	     (recur rest body ...)))
+	((recur (hd . rest) body ...)
+	 #'(with-syntax (hd)
+	     (recur rest body ...))))))
+  
 
   (trace-define-syntax define-foreign-struct
-		       (lambda (stx)
+    (lambda (stx)
 
-			 (define construct-name
-			   (lambda (template-identifier . args)
-			     (datum->syntax template-identifier
-					    (string->symbol (apply string-append (map (lambda (x)
-											(if (string? x)
-											    x
-											    (symbol->string (syntax->datum x))))
-										      args))))))
+      (define struct-info)
 
-			 (define construct-make-def
-			   (lambda (struct-name member-spec)
-			     (with-syntax ([struct-name struct-name]
-					   [((setters . val-exprs) ...)
-					    (map (lambda (member)
-						   (with-syntax ((name (car member))
-								 (type (cdr member))
-								 (struct-name struct-name))
-						     (with-syntax ([val-expr (construct-name #'struct-name
-											     "val-"
-											     #'name)])
-						       (cons #'(cond
-								((string? val-expr)
-								 (write-cstring obj struct-name (name) val-expr))
-								(val-expr (ftype-set! struct-name (name) obj val-expr)))
-							     #'val-expr))))
-						 member-spec)])
-			       #'(lambda (val-exprs ...)
-				   (let ((obj (make-foreign-object struct-name)))
-				     setters ...
-				     obj)))))
+      (define construct-name
+	(lambda (template-identifier . args)
+	  (datum->syntax template-identifier
+			 (string->symbol (apply string-append (map (lambda (x)
+								     (if (string? x)
+									 x
+									 (symbol->string (syntax->datum x))))
+								   args))))))
 
-			 (define construct-val-defs
-			   (lambda (struct-name member-names)
-			     (with-syntax ((struct-name struct-name))
-			       (map (lambda (member-name)
-				      (with-syntax ((lambda-name (construct-name #'struct-name
-										 #'struct-name "-" member-name))
-						    (lambda-&name (construct-name #'struct-name
-										  #'struct-name "-&" member-name))
-						    (member-name member-name))
-					#'(begin (define-ptr-lambda lambda-name struct-name member-name ftype-ref)
-						 (define-ptr-lambda lambda-&name struct-name member-name ftype-&ref))))
-				    member-names))))
-			 
-			 (syntax-case stx ()
-			   [(_ struct-name ((member-name . member-type) ...))
-			    (for-all identifier? #'(struct-name member-name ...))
-			    (with-syntax ([struct-name #'struct-name]
-					  [make-struct-name (construct-name #'struct-name "make-" #'struct-name)]
-					  [make-struct-def
-					   (construct-make-def #'struct-name
-							       #'((member-name . member-type) ...))]
-					  [(val-defs ...)
-					   (construct-val-defs #'struct-name #'(member-name ...))])
-			      #'(begin
-				  (define-ftype struct-name (struct [member-name member-type] ...))
-				  (define make-struct-name make-struct-def)
-				  val-defs ...))])))
+      
+      (define construct-make-def
+	(lambda (struct-name member-spec member-details)
+	  (define scalar-type '(unsigned-32 int uptr))
+
+	  
+	  ;; generates the setter expression for a type
+	  (define struct-set-syntax
+	    (lambda (type name val-expr)
+
+	      (define gen-setter
+		(lambda ()
+		  
+		  (with-syntax ((struct-name struct-name)
+				(name name)
+				(type type)
+				(val-expr val-expr))
+		    (let ((member-info (assoc (syntax->datum #'type) member-details)))
+		      
+		      (cond
+		       ;; currently handling only one level of nesting
+		       ;; this resolution will not handle the case where the
+		       ;; member of a member is also a struct,
+		       ;;
+		       ;; hence,only scalar and pointer value can be set for a member
+		       (member-info (map (lambda (member-spec)
+					   (with-syntax ((field-name (datum->syntax
+								      #'name
+								      (car member-spec))))
+					     #'(ftype-set! struct-name
+							   (name field-name)
+							   obj
+							   val-expr)))
+					 (cdr member-info)))
+		       (else (list #'(ftype-set! struct-name (name) obj val-expr))))))))
+	      
+	      (with-syntax* ((struct-name struct-name)
+			     (name name)
+			     (val-expr val-expr)
+			     ((gen-setter ...) (gen-setter)))
+		(case (syntax->datum type)
+		  ((uptr)
+		   #'(cond
+		      ((string? val-expr)
+		       (write-cstring obj struct-name (name) val-expr))
+
+	  	      (else gen-setter ...)))
+		  
+	  	  (else #'(begin gen-setter ...))))))
+	  
+	  
+	  (with-syntax ([struct-name struct-name]
+			[((setters ... . val-exprs) ...)
+			 (map (lambda (member)
+				(with-syntax* ((name (car member))
+					       (type (cdr member))
+					       (struct-name struct-name)
+					       (val-expr (construct-name #'struct-name
+									 "val-"
+									 #'name))
+					       ((setter-syntax ...)
+						(struct-set-syntax #'type
+								   #'name
+								   #'val-expr)))
+				  (cons #'(setter-syntax ...) #'val-expr)))
+			      member-spec)])
+	    #'(lambda (val-exprs ...)
+		(let ((obj (make-foreign-object struct-name)))
+		  setters ... ...
+		  obj)))))
+
+      (define construct-val-defs
+	(lambda (struct-name member-spec member-details)
+
+	  (define construct-ptr-lambdas
+	    (lambda (lambda-suffix member-spec)
+	      (with-syntax* ((struct-name struct-name)
+			     (lambda-suffix lambda-suffix)
+			     (member-spec member-spec)
+			     (lambda-name
+			      (construct-name #'struct-name
+					      #'struct-name "-" #'lambda-suffix))
+			     
+			     (lambda-&name
+			      (construct-name #'struct-name
+					      #'struct-name "-&" #'lambda-suffix)))
+		#'(begin
+		    (define-ptr-lambda lambda-name struct-name member-spec ftype-ref)
+		    (define-ptr-lambda lambda-&name struct-name member-spec ftype-&ref)))))
+	  
+	  (with-syntax ((struct-name struct-name))
+	    (map (lambda (member)
+		   (with-syntax* ((name (car member))
+				  (type (cdr member)))
+		     (let ((member-types (assoc (syntax->datum #'type) member-details)))
+		       (cond
+
+			;; getters for struct fields
+			;; only one level of nesting handled
+			(member-types
+			 (with-syntax* (((getters ...)
+					 (map (lambda (member-spec)
+						(with-syntax* ((field-name (datum->syntax
+									    #'name
+									    (car member-spec)))
+							       (suffix
+								(construct-name #'struct-name
+										#'name
+										"-"
+										#'field-name)))
+						  (construct-ptr-lambdas #'suffix
+									 (list #'name
+									       #'field-name))))
+					      (cdr member-types))))
+			   #'(begin getters ...)))
+
+			;; scalar / pointer getters
+			(else (construct-ptr-lambdas #'name (list #'name)))))))
+		 member-spec))))
+      
+      (syntax-case stx ()
+	[(_ struct-name ((member-name . member-type) ...))
+	 (for-all identifier? #'(struct-name member-name ...))
+	 ;; to lookup compile time values, used to
+	 ;; lookup fields of member structs when struct members are values
+	 (lambda (lookup)
+	   ;; member-details retrieves information of member-types which have been
+	   ;; defined by define-foreign-struct
+	   ;; this is used to generate the ftype-ref! calls
+	   (let ((member-details (filter identity
+					 (map (lambda (type)
+						(let ((members (and (identifier? type)
+								  (lookup type #'struct-info))))
+						  (cond
+						   (members
+						    (cons (syntax->datum type) members))
+						   (else #f))))
+					      #'(member-type ...)))))
+	     
+	     (with-syntax ([struct-name #'struct-name]
+			   [make-struct-name (construct-name #'struct-name "make-" #'struct-name)]
+			   [make-struct-def
+			    (construct-make-def #'struct-name
+						#'((member-name . member-type) ...)
+						member-details)]
+			   [(val-defs ...)
+			    (construct-val-defs #'struct-name
+						#'((member-name . member-type) ...)
+						member-details)])
+	       #'(begin
+		   (define-ftype struct-name (struct [member-name member-type] ...))
+		   (define-property struct-name struct-info '((member-name . member-type) ...))
+		   (define make-struct-name make-struct-def)
+		   val-defs ...))))])))
 
   ;; ref: https://www.cs.indiana.edu/~dyb/pubs/ftypes.pdf
   (define-syntax (define-enum-ftype x)
@@ -260,8 +383,8 @@
   ;; 				 (when x
   ;; 				   (do-free x)
   ;; 				   (lp))))))
+  ;; 
   )
-
 #|
 
 --------------------------------------------
@@ -279,6 +402,7 @@
 
 (define-foreign-struct abc
   ((a . int)
+   (e . asas)
    (d . (* (* char)))))
 
 (define strs '("hello" "world"))

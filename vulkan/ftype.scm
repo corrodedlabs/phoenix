@@ -12,6 +12,67 @@
 
 (define-ftype flags uint32-t)
 
+(define-syntax callback
+  (syntax-rules ()
+    ((_ f (<args> ...) <ret>)
+     (let ([code (foreign-callable f (<args> ...) <ret>)])
+       (lock-object code)
+       (foreign-callable-entry-point code)))))
+
+
+(define camel-case->kebab-case
+  (lambda (str)
+    (list->string
+     (apply append (map (lambda (ch)
+			  (cond
+			   ((char-upper-case? ch) (list #\- (char-downcase ch)))
+			   (else (list ch))))
+			(string->list str))))))
+
+(trace-define-syntax define-vulkan-command
+  (lambda (stx)
+    (syntax-case stx ()
+      [(_ command (argument-types ...) return-type)
+       (let ((command-string (symbol->string (syntax->datum #'command))))
+	 (with-syntax ((command-name (datum->syntax #'command
+						    command-string))
+		       (_ffi-proc (datum->syntax #'command
+						 (string->symbol
+						  (string-append "_" command-string))))
+		       (ffi-proc (datum->syntax #'command
+						(string->symbol
+						 (camel-case->kebab-case command-string))))
+		       ((arg-names ...) (map (lambda (t) (datum->syntax #'command (gensym)))
+					   #'(argument-types ...))))
+	   #'(begin (define _ffi-proc
+		      (foreign-procedure command-name (argument-types ...) return-type))
+
+		    (define ffi-proc
+		      (lambda (arg-names ...)
+			(case (_ffi-proc arg-names ...)
+			  ((0) #t)
+			  (else (error "vulkan command failed" command-name))))))))])))
+
+;; this function covers a general pattern for vulkan functions to return an array
+;; the f provided will be called two times:
+;; once for the value of count and then
+;; after allocation of pointer-type array for the count size to
+;; read the results in the pointer
+;; finally, a cons pair of count and ftype-pointer is returned
+(define-syntax call-with-array-pointer
+  (syntax-rules ()
+    ((_ pointer-type f)
+     (let ((count (make-foreign-object unsigned-32)))
+       (f count (make-ftype-pointer pointer-type 0))
+       (let ((arr (make-foreign-array pointer-type (read-unsigned-32 count))))
+	 (f count arr)
+	 (cons (read-unsigned-32 count) arr))))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;
+;; Instance Creation ;;
+;;;;;;;;;;;;;;;;;;;;;;;
+
 (define-vulkan-struct vk-application-info
   ((application-name . uptr)
    (application-version . uint32-t)
@@ -120,65 +181,47 @@
    (user-data . uptr)))
 
 
-(define-syntax callback
-  (syntax-rules ()
-    ((_ f (<args> ...) <ret>)
-     (let ([code (foreign-callable f (<args> ...) <ret>)])
-       (lock-object code)
-       (foreign-callable-entry-point code)))))
 
-(define-ftype vk-instance (struct (instance uptr)))
+(define-ftype vk-instance uptr)
 
-;; physical device
 
-(define-ftype vk-physical-device (struct (physical-device uptr)))
+;;;;;;;;;;;;;;;;;;;;;;
+;; Physical Devices ;;
+;;;;;;;;;;;;;;;;;;;;;;
 
-(define _enumerate-physical-devices
-  (foreign-procedure "vkEnumeratePhysicalDevices"
-		     ((& vk-instance) (* unsigned-32) (* vk-physical-device)) int))
-
-(define camel-case->kebab-case
-  (lambda (str)
-    (list->string
-     (apply append (map (lambda (ch)
-			  (cond
-			   ((char-upper-case? ch) (list #\- (char-downcase ch)))
-			   (else (list ch))))
-			(string->list str))))))
-
-(trace-define-syntax define-vulkan-command
-  (lambda (stx)
-    (syntax-case stx ()
-      [(_ command (argument-types ...) return-type)
-       (let ((command-string (symbol->string (syntax->datum #'command))))
-	 (with-syntax ((command-name (datum->syntax #'command
-						    command-string))
-		       (_ffi-proc (datum->syntax #'command
-						 (string->symbol
-						  (string-append "_" command-string))))
-		       (ffi-proc (datum->syntax #'command
-						(string->symbol
-						 (camel-case->kebab-case command-string))))
-		       ((arg-names ...) (map (lambda (t) (datum->syntax #'command (gensym)))
-					   #'(argument-types ...))))
-	   #'(begin (define _ffi-proc
-		      (foreign-procedure command-name (argument-types ...) return-type))
-
-		    (define ffi-proc
-		      (lambda (arg-names ...)
-			(case (_ffi-proc arg-names ...)
-			  ((0) #t)
-			  (else (error "vulkan command failed" command-name))))))))])))
+(define-ftype vk-physical-device uptr)
 
 (define-vulkan-command
   vkEnumeratePhysicalDevices
   ((& vk-instance) (* unsigned-32) (* vk-physical-device)) int)
 
+
+;;;;;;;;;;;;
+;; Queues ;;
+;;;;;;;;;;;;
+
+(define-foreign-struct vk-extent-3d
+  ((width . unsigned-32)
+   (height . unsigned-32)
+   (depth . unsigned-32)))
+
+(define-foreign-struct vk-queue-family-properties
+  ((queue-flags . unsigned-32)
+   (queue-count . unsigned-32)
+   (timestamp-valid-bits . unsigned-32)
+   (min-image-transfer-granularity . vk-extent-3d)))
+
+(define vkGetPhysicalDeviceQueueFamilyProperties
+  (foreign-procedure "vkGetPhysicalDeviceQueueFamilyProperties"
+		     ((& vk-physical-device) (* unsigned-32) (* vk-queue-family-properties))
+		     void))
+
 #!eof
 
+--------------------------------------------
+
 (import (ffi)
-	(vulkan structure-types)
-	(srfi 13))
+	(vulkan structure-types))
 
 (load "vulkan/ftype.scm")
 

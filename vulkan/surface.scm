@@ -38,9 +38,9 @@ experiments:
 
 (load "vulkan/ftype.scm")
 (load "vulkan/instance.scm")
-(define instance (init-vulkan))
+(define ins (init-vulkan))
 
 (load "vulkan/surface.scm")
 
 
-(define window-obj (setup-window instance 1366 768))
+(define window-obj (setup-window ins 1366 768))
