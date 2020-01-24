@@ -250,6 +250,38 @@
 (define-vulkan-command vkGetPhysicalDeviceSurfaceSupportKHR
   ((& vk-physical-device) unsigned-32 (& vk-surface) (* vk-bool32)))
 
+(define-ftype vk-queue uptr)
+
+;;;;;;;;;;;;;;;;;;;;
+;; Logical Device ;;
+;;;;;;;;;;;;;;;;;;;;
+
+(define-vulkan-struct vk-device-queue-create-info
+  ((flags . unsigned-32)
+   (queue-family-index . unsigned-32)
+   (queue-count . unsigned-32)
+   (queue-priorities . (* float))))
+
+(define-vulkan-struct vk-device-create-info
+  ((flags . unsigned-32)
+   (queue-create-info-count . unsigned-32)
+   (queue-create-infos . (* vk-device-queue-create-info))
+   (enabled-layer-count . unsigned-32)
+   (enabled-layer-names . uptr)
+   (enabled-extension-count . unsigned-32)
+   (enabled-extension-names . uptr)
+   (enabled-features . uptr)))
+
+(define-ftype vk-device uptr)
+
+(define-vulkan-command vkCreateDevice
+  ((& vk-physical-device) (* vk-device-create-info) uptr (* vk-device)))
+
+(define vk-get-device-queue
+  (foreign-procedure "vkGetDeviceQueue"
+		     ((& vk-device) unsigned-32 unsigned-32 (* vk-queue))
+		     void))
+
 #!eof
 
 --------------------------------------------

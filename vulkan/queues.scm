@@ -44,3 +44,13 @@
 	  i)
 
 	 (else (lp (1+ i))))))))
+
+
+
+(define create-queue-handles
+  (lambda (device)
+    (let ((graphics-queue (make-foreign-object vk-queue))
+	  (presentation-queue (make-foreign-object vk-queue)))
+      (vk-get-device-queue device 0  0 graphics-queue)
+      (vk-get-device-queue device 0  0 presentation-queue)
+      (cons graphics-queue presentation-queue))))
