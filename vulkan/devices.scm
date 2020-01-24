@@ -1,6 +1,6 @@
 
 
-(define +device-extensions+ (list "VK_KHR_SWAPCHAIN"))
+(define +device-extensions+ (list "VK_KHR_swapchain"))
 
 (define get-physical-devices
   (lambda (instance)
