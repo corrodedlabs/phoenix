@@ -29,6 +29,8 @@ experiments:
 	(glfw)
 	(vulkan structure-types))
 
+(glfw-init)
+
 (define v (load-shared-object "libvulkan.so.1"))
 
 (load "vulkan/ftype.scm")

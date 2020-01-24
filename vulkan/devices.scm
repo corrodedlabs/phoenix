@@ -1,6 +1,6 @@
 
 
-
+(define +device-extensions+ (list "VK_KHR_SWAPCHAIN"))
 
 (define get-physical-devices
   (lambda (instance)
@@ -16,21 +16,21 @@
       (lambda ()
 	(let ((queue-priority (make-foreign-object float)))
 	  (ftype-set! float () queue-priority 1.0)
-	  (make-vk-device-create-info device-create-info
-				      0
-				      0
-				      1
-				      (make-vk-device-queue-create-info device-queue-create-info
-									0
-									0
-									queue-index
-									1
-									queue-priority)
-				      0
-				      0
-				      0
-				      0
-				      0))))
+	  (make-vk-device-create-info  device-create-info
+				       0
+				       0
+				       1
+				       (make-vk-device-queue-create-info device-queue-create-info
+									 0
+									 0
+									 queue-index
+									 1
+									 queue-priority)
+				       0
+				       0
+				       1
+				       (strings->ptr +device-extensions+)
+				       0))))
     
     (let ((device-info (create-device-info))
 	  (device (make-foreign-object vk-device)))
@@ -40,8 +40,9 @@
 #!eof
 
 --------------------------------------------
-(load "vulkan/devices.scm")
 (load "vulkan/queues.scm")
+(load "vulkan/devices.scm")
+
 
 (define devices-arr (get-physical-devices ins))
 (define physical-device-ptr (cdr devices-arr))

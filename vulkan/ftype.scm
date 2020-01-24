@@ -1,6 +1,6 @@
 
 
-(define-syntax define-vulkan-struct
+(trace-define-syntax define-vulkan-struct
   (syntax-rules ()
     ((_ struct-name ((member-name . member-type) ...))
      (define-foreign-struct struct-name
@@ -269,7 +269,7 @@
    (enabled-layer-count . unsigned-32)
    (enabled-layer-names . uptr)
    (enabled-extension-count . unsigned-32)
-   (enabled-extension-names . uptr)
+   (enabled-extension-names . (* uptr))
    (enabled-features . uptr)))
 
 (define-ftype vk-device uptr)

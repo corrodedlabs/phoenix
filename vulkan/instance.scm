@@ -12,9 +12,9 @@
     ((foreign-procedure "vkGetInstanceProcAddr"
 			((& vk-instance) string) uptr) instance procedure-name)))
 
-  ;;;;;;;;;;;;;;;;;;;
-;; Vulkan Layers ;;
-  ;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;
+;; Vulkan Layers ;;;;
+;;;;;;;;;;;;;;;;;;;;;
 
 
 (define *validation-layer* "VK_LAYER_KHRONOS_validation")
@@ -56,9 +56,9 @@
 ;; (get-supported-layers)
 
 
-  ;;;;;;;;;;;;;;;;;;;;;;;
-;; Instance Creation ;;
-  ;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Instance Creation ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (make-vulkan-instance validation?)
   
@@ -117,7 +117,10 @@
 (define debug-callback
   (lambda (message-severity message-type callback-data user-data)
     (write "callback")
-    (write message-type)))
+    (write message-type)
+    (write (ptr->string (vk-debug-utils-messenger-callback-data-message callback-data)))
+    (newline)
+    0))
 
 (define create-debug-utils-messenger
   (lambda (instance)
