@@ -3,11 +3,6 @@
 
 (define-record-type window-details (fields window surface))
 
-(define-ftype vk-surface (struct (surface uptr)))
-
-;; assumes libglfw is loaded
-(define-vulkan-command glfwCreateWindowSurface
-  ((& vk-instance) uptr uptr (* vk-surface)) int)
 
 (define create-surface
   (lambda (instance window)

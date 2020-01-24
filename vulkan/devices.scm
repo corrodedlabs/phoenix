@@ -14,21 +14,7 @@
 (load "vulkan/devices.scm")
 
 (define devices-arr (get-physical-devices ins))
+(define physical-device-ptr (cdr devices-arr))
 
-(define get-queue-family-properties
-  (lambda (physical-device)
-    (call-with-array-pointer vk-queue-family-properties
-			     (lambda (count-ptr array-ptr)
-			       (vkGetPhysicalDeviceQueueFamilyProperties physical-device
-									 count-ptr
-									 array-ptr)))))
-
-(define physical-device (cdr devices-arr))
-
-(define family-props-arr (get-queue-family-properties physical-device))
-
-
-
-(vk-queue-family-properties-queue-count
- (ftype-&ref vk-queue-family-properties () (cdr family-props-arr) 2))
+(find-queue-family physical-device-ptr (window-details-surface window-obj))
 

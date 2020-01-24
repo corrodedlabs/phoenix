@@ -9,8 +9,8 @@
 	(member-name . member-type) ...]))))
 
 (define-ftype uint32-t unsigned-32)
-
 (define-ftype flags uint32-t)
+(define-ftype vk-bool32 unsigned-32)
 
 (define-syntax callback
   (syntax-rules ()
@@ -23,16 +23,32 @@
 (define camel-case->kebab-case
   (lambda (str)
     (list->string
-     (apply append (map (lambda (ch)
-			  (cond
-			   ((char-upper-case? ch) (list #\- (char-downcase ch)))
-			   (else (list ch))))
-			(string->list str))))))
+     (let lp ((str (reverse (string->list str)))
+	      (i 0)
+	      (dest '()))
+       (cond
+	((null? str) (apply append dest)) 
+	
+	((and (char-upper-case? (car str))
+	    (< 1 (length str))
+	    (not (char-upper-case? (cadr str)))) (lp (cdr str)
+						   (1+ i)
+						   (cons (list #\- (char-downcase (car str)))
+							 dest)))
+
+	((char-upper-case? (car str)) (lp (cdr str)
+					  (1+ i)
+					  (cons (list (char-downcase (car str))) dest)))
+	
+	(else (lp (cdr str)
+		  (1+ i)
+		  (cons (list (car str)) dest))))))))
+
 
 (trace-define-syntax define-vulkan-command
   (lambda (stx)
     (syntax-case stx ()
-      [(_ command (argument-types ...) return-type)
+      [(_ command (argument-types ...))
        (let ((command-string (symbol->string (syntax->datum #'command))))
 	 (with-syntax ((command-name (datum->syntax #'command
 						    command-string))
@@ -45,7 +61,7 @@
 		       ((arg-names ...) (map (lambda (t) (datum->syntax #'command (gensym)))
 					   #'(argument-types ...))))
 	   #'(begin (define _ffi-proc
-		      (foreign-procedure command-name (argument-types ...) return-type))
+		      (foreign-procedure command-name (argument-types ...) int))
 
 		    (define ffi-proc
 		      (lambda (arg-names ...)
@@ -184,6 +200,14 @@
 
 (define-ftype vk-instance uptr)
 
+;;;;;;;;;;;;;
+;; Surface ;;
+;;;;;;;;;;;;;
+
+(define-ftype vk-surface uptr)
+
+;; assumes libglfw is loaded
+(define-vulkan-command glfwCreateWindowSurface ((& vk-instance) uptr uptr (* vk-surface)))
 
 ;;;;;;;;;;;;;;;;;;;;;;
 ;; Physical Devices ;;
@@ -193,8 +217,7 @@
 
 (define-vulkan-command
   vkEnumeratePhysicalDevices
-  ((& vk-instance) (* unsigned-32) (* vk-physical-device)) int)
-
+  ((& vk-instance) (* unsigned-32) (* vk-physical-device)))
 
 ;;;;;;;;;;;;
 ;; Queues ;;
@@ -211,10 +234,21 @@
    (timestamp-valid-bits . unsigned-32)
    (min-image-transfer-granularity . vk-extent-3d)))
 
+(define-enum-ftype vk-queue-flag-bits
+  (vk-queue-graphics-bit  #x00000001)
+  (vk-queue-compute-bit  #x00000002)
+  (vk-queue-transfer-bit  #x00000004)
+  (vk-queue-sparse-binding-bit  #x00000008)
+  (vk-queue-protected-bit  #x00000010)
+  (vk-queue-flag-bits-max-enum  #x7fffffff))
+
 (define vkGetPhysicalDeviceQueueFamilyProperties
   (foreign-procedure "vkGetPhysicalDeviceQueueFamilyProperties"
 		     ((& vk-physical-device) (* unsigned-32) (* vk-queue-family-properties))
 		     void))
+
+(define-vulkan-command vkGetPhysicalDeviceSurfaceSupportKHR
+  ((& vk-physical-device) unsigned-32 (& vk-surface) (* vk-bool32)))
 
 #!eof
 
