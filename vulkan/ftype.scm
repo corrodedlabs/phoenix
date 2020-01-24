@@ -267,7 +267,7 @@
    (queue-create-info-count . unsigned-32)
    (queue-create-infos . (* vk-device-queue-create-info))
    (enabled-layer-count . unsigned-32)
-   (enabled-layer-names . uptr)
+   (enabled-layer-names . (* uptr))
    (enabled-extension-count . unsigned-32)
    (enabled-extension-names . (* uptr))
    (enabled-features . uptr)))
@@ -282,13 +282,55 @@
 		     ((& vk-device) unsigned-32 unsigned-32 (* vk-queue))
 		     void))
 
+;;;;;;;;;;;;;;;
+;; swapchain ;;
+;;;;;;;;;;;;;;;
+
+(define-foreign-struct vk-extent-2d
+  ((width . unsigned-32)
+   (height . unsigned-32)))
+
+(define-enum-ftype vk-surface-transform-flag-bits
+  (vk-surface-transform-identity-bit-khr  #x00000001)
+  (vk-surface-transform-rotate-90-bit-khr  #x00000002)
+  (vk-surface-transform-rotate-180-bit-khr  #x00000004)
+  (vk-surface-transform-rotate-270-bit-khr  #x00000008)
+  (vk-surface-transform-horizontal-mirror-bit-khr  #x00000010)
+  (vk-surface-transform-horizontal-mirror-rotate-90-bit-khr  #x00000020)
+  (vk-surface-transform-horizontal-mirror-rotate-180-bit-khr  #x00000040)
+  (vk-surface-transform-horizontal-mirror-rotate-270-bit-khr  #x00000080)
+  (vk-surface-transform-inherit-bit-khr  #x00000100)
+  (vk-surface-transform-flag-bits-max-enum-khr  #x7fffffff))
+
+(define-foreign-struct vk-surface-capabilities
+  ((min-image-count . unsigned-32)
+   (max-image-count . unsigned-32)
+   (current-extent . vk-extent-2d)
+   (min-image-extent . vk-extent-2d)
+   (max-image-extent . vk-extent-2d)
+   (max-image-array-layers . unsigned-32)
+   (supported-transforms . flags)
+   (current-transform . vk-surface-transform-flag-bits)
+   (supported-composite-alpha . flags)
+   (supported-usage-flags . flags)))
+
+(define-vulkan-command vkGetPhysicalDeviceSurfaceCapabilitiesKHR
+  ((& vk-physical-device) (& vk-surface) (* vk-surface-capabilities)))
+
+(define-foreign-struct vk-surface-format-khr
+  ((format . vk-format)
+   (color-space . vk-color-space-khr)))
+
+(define-vulkan-command vkGetPhysicalDeviceSurfaceFormatsKHR
+  ((& vk-physical-device) (& vk-surface) (* unsigned-32) (* vk-surface-format-khr)))
+
 #!eof
 
 --------------------------------------------
 
 (import (ffi)
 	(vulkan structure-types))
-
+(load "vulkan/enums.scm")
 (load "vulkan/ftype.scm")
 
 (define v (load-shared-object "libvulkan.so.1"))

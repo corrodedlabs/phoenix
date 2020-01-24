@@ -1,6 +1,10 @@
 (define validation? #t)
 (define *validation-extension* "VK_EXT_debug_utils")
 
+(define *validation-layers-info*
+  (cond
+   (validation? (cons 1 (strings->ptr (list *validation-layer*))))
+   (else (cons 0 #f))))
 
 (define (VK_MAKE_VERSION major minor patch)
   (logor (ash major 22) (ash minor 12) (ash patch 0)))
@@ -96,17 +100,14 @@
 					     VK_API_VERSION_1_1
 					     VK_API_VERSION_1_1))
 	 (extensions (get-required-extensions))
-	 (layers-info (cond
-		       (validation?
-			(cons 1 (strings->ptr (list *validation-layer*))))
-		       (else (cons 0 #f))))
 	 (instance-info (make-vk-instance-create-info instance-create-info
 						      0
 						      0
 						      app-info
 						      ;; 0 #f
-						      (car layers-info)
-						      (ftype-pointer-address (cdr layers-info))
+						      (car *validation-layers-info*)
+						      (ftype-pointer-address
+						       (cdr *validation-layers-info*))
 						      ;; 0 #f
 						      (car extensions)
 						      (ftype-pointer-address (cdr extensions)))))

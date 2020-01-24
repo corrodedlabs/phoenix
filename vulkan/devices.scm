@@ -26,8 +26,8 @@
 									 queue-index
 									 1
 									 queue-priority)
-				       0
-				       0
+				       (car *validation-layers-info*)
+				       (cdr *validation-layers-info*)
 				       1
 				       (strings->ptr +device-extensions+)
 				       0))))
