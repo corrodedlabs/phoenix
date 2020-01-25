@@ -16,13 +16,31 @@
 	  make-foreign-array
 	  define-foreign-struct
 	  define-enum-ftype
-	  cstring)
+	  cstring
+	  construct-name
+
+	  define-collection-lambdas
+	  make-array-pointer
+	  array-pointer-length
+	  array-pointer-raw-ptr
+	  array-pointer-empty?
+	  array-pointer?
+	  with-new-array-pointer)
 
   (import (chezscheme))
 
   (define libc (load-shared-object "libc.so.6"))
 
   (meta define identity (lambda (x) x))
+
+  (meta define construct-name
+	(lambda (template-identifier . args)
+	  (datum->syntax template-identifier
+			 (string->symbol (apply string-append (map (lambda (x)
+								     (if (string? x)
+									 x
+									 (symbol->string (syntax->datum x))))
+								   args))))))
   
   (define-condition-type &ffi-condition &condition
     ffi-condition ffi-condition?
@@ -183,22 +201,86 @@
 	((recur (hd . rest) body ...)
 	 #'(with-syntax (hd)
 	     (recur rest body ...))))))
+
+  ;;;;;;;;;;;;;;;;;;;;
+  ;; array pointer  ;;
+;;;;;;;;;;;;;;;;;;;;
+
+  (define-record-type array-pointer (fields length raw-ptr type) (nongenerative))
+
+  ;; this function covers a general pattern for vulkan functions to return an array
+  ;; the f provided will be called two times:
+  ;; once for the value of count and then
+  ;; after allocation of pointer-type array for the count size to
+  ;; read the results in the pointer
+  ;; finally, a cons pair of count and ftype-pointer is returned
+  (trace-define-syntax with-new-array-pointer
+    (syntax-rules ()
+      ((_ pointer-type f)
+       (let ((count (make-foreign-object unsigned-32)))
+	 (f count (make-ftype-pointer pointer-type 0))
+	 (let ((arr (make-foreign-array pointer-type (read-unsigned-32 count))))
+	   (f count arr)
+	   (make-array-pointer (read-unsigned-32 count) arr #'pointer-type))))))
+
+
+  (define array-pointer-empty?
+    (lambda (array-ptr)
+      (equal? 0 (array-pointer-length array-ptr))))
+
+
+  (trace-define-syntax define-collection-lambdas
+    (lambda (stx)
+      (syntax-case stx ()
+	[(_ pointer-type)
+	 (with-syntax ((map-lambda (construct-name #'pointer-type
+						   #'pointer-type "-pointer-map"))
+		       (find-lambda (construct-name #'pointer-type
+						    #'pointer-type "-pointer-find"))
+		       (car-lambda (construct-name #'pointer-type
+						   #'pointer-type "-pointer-car")))
+	   #'(begin
+	       (define map-lambda
+		 (lambda (f arr-ptr)
+		   (let lp ((i 0)
+			    (xs '()))
+		     (cond
+		      ((= i (array-pointer-length arr-ptr)) (reverse xs))
+
+		      (else (lp (1+ i)
+				(cons (f (ftype-&ref pointer-type
+						     ()
+						     (array-pointer-raw-ptr arr-ptr)
+						     i))
+				      xs)))))))
+
+	       (define find-lambda
+		 (lambda (f arr-ptr)
+		   (let lp ((i 0))
+		     (cond
+		      ((= i (array-pointer-length arr-ptr)) #f)
+
+		      (else (let ((e (ftype-&ref pointer-type
+						 ()
+						 (array-pointer-raw-ptr arr-ptr)
+						 i)))
+			      (if (f e)
+				  e
+				  (lp (1+ i)))))))))
+
+	       (define car-lambda
+		 (lambda (arr-ptr)
+		   (if (> 1 (array-pointer-length arr-ptr))
+		       #f
+		       (array-pointer-raw-ptr arr-ptr))))))])))
   
+
+
 
   (trace-define-syntax define-foreign-struct
     (lambda (stx)
 
       (define struct-info)
-
-      (define construct-name
-	(lambda (template-identifier . args)
-	  (datum->syntax template-identifier
-			 (string->symbol (apply string-append (map (lambda (x)
-								     (if (string? x)
-									 x
-									 (symbol->string (syntax->datum x))))
-								   args))))))
-
       
       (define construct-make-def
 	(lambda (struct-name member-spec member-details)
@@ -245,9 +327,9 @@
 		      ((string? val-expr)
 		       (write-cstring obj struct-name (name) val-expr))
 
-	  	      (else gen-setter ...)))
+		      (else gen-setter ...)))
 		  
-	  	  (else #'(begin gen-setter ...))))))
+		  (else #'(begin gen-setter ...))))))
 	  
 	  
 	  (with-syntax ([struct-name struct-name]

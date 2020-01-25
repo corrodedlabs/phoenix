@@ -69,21 +69,6 @@
 			  ((0) #t)
 			  (else (error "vulkan command failed" command-name))))))))])))
 
-;; this function covers a general pattern for vulkan functions to return an array
-;; the f provided will be called two times:
-;; once for the value of count and then
-;; after allocation of pointer-type array for the count size to
-;; read the results in the pointer
-;; finally, a cons pair of count and ftype-pointer is returned
-(define-syntax call-with-array-pointer
-  (syntax-rules ()
-    ((_ pointer-type f)
-     (let ((count (make-foreign-object unsigned-32)))
-       (f count (make-ftype-pointer pointer-type 0))
-       (let ((arr (make-foreign-array pointer-type (read-unsigned-32 count))))
-	 (f count arr)
-	 (cons (read-unsigned-32 count) arr))))))
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;
 ;; Instance Creation ;;
@@ -320,9 +305,25 @@
 (define-foreign-struct vk-surface-format-khr
   ((format . vk-format)
    (color-space . vk-color-space-khr)))
+(define-collection-lambdas vk-surface-format-khr)
+
 
 (define-vulkan-command vkGetPhysicalDeviceSurfaceFormatsKHR
   ((& vk-physical-device) (& vk-surface) (* unsigned-32) (* vk-surface-format-khr)))
+
+
+(define-enum-ftype vk-present-mode-khr
+  (vk-present-mode-immediate-khr  0)
+  (vk-present-mode-mailbox-khr  1)
+  (vk-present-mode-fifo-khr  2)
+  (vk-present-mode-fifo-relaxed-khr  3)
+  (vk-present-mode-shared-demand-refresh-khr  1000111000)
+  (vk-present-mode-shared-continuous-refresh-khr  1000111001)
+  (vk-present-mode-max-enum-khr  #x7fffffff))
+
+(define-vulkan-command vkGetPhysicalDeviceSurfacePresentModesKHR
+  ((& vk-physical-device) (& vk-surface) (* unsigned-32) (* vk-present-mode-khr)))
+
 
 #!eof
 
