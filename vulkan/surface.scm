@@ -3,6 +3,7 @@
 
 (define-record-type window-details (fields window surface))
 
+(define-record-type dimension (width height))
 
 (define create-surface
   (lambda (instance window)

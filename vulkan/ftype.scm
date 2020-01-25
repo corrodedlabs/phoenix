@@ -320,6 +320,7 @@
   (vk-present-mode-shared-demand-refresh-khr  1000111000)
   (vk-present-mode-shared-continuous-refresh-khr  1000111001)
   (vk-present-mode-max-enum-khr  #x7fffffff))
+(define-collection-lambdas vk-present-mode-khr)
 
 (define-vulkan-command vkGetPhysicalDeviceSurfacePresentModesKHR
   ((& vk-physical-device) (& vk-surface) (* unsigned-32) (* vk-present-mode-khr)))
