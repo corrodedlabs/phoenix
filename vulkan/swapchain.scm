@@ -2,7 +2,8 @@
 (define-record-type swapchain-details
   (fields surface-format
 	  present-mode
-	  extent))
+	  extent
+	  capabilities))
 
 (define choose-swapchain-settings
   (lambda (surface-formats present-modes surface-capabilities)
@@ -30,12 +31,15 @@
 	;; max(capabilities.minImageExtent.width,
  	;; min(capabilities.maxImageExtent.width, actualExtent.width));
 	;; actualExtent comes from window dimension
-	(make-vk-extent-2d (vk-surface-capabilities-max-image-extent-width capabilities)
-			   (vk-surface-capabilities-max-image-extent-height capabilities))))
+	(make-vk-extent-2d (vk-surface-capabilities-max-image-extent-width
+			    surface-capabilities)
+			   (vk-surface-capabilities-max-image-extent-height
+			    surface-capabilities))))
     
     (make-swapchain-details (choose-surface-format)
 			    (choose-present-modes)
-			    (choose-swapchain-extent))))
+			    (choose-swapchain-extent)
+			    surface-capabilities)))
 
 (define query-swapchain-details
   (lambda (physical-device surface)
@@ -74,12 +78,53 @@
       (and (swapchain-compatible? surface-formats present-modes)
 	 (choose-swapchain-settings surface-formats present-modes capabilities)))))
 
+(define create-swapchain
+  (lambda (physical-device device surface queue-index)
+
+    (define create-swapchain-info
+      (lambda (swapchain-details)
+	(let ((surface-format (swapchain-details-surface-format swapchain-details))
+	      (capabilities (swapchain-details-capabilities swapchain-details))
+	      (queue-indices-ptr (make-foreign-array unsigned-32 2)))
+	  (ftype-set! unsigned-32 () queue-indices-ptr queue-index 0)
+	  (ftype-set! unsigned-32 () queue-indices-ptr queue-index 1)
+	  (make-vk-swapchain-create-info-khr swapchain-create-info-khr
+					     0
+					     0
+					     (foreign-ref 'uptr
+							  (ftype-pointer-address surface)
+							  0)
+					     (vk-surface-capabilities-max-image-count
+					      capabilities)
+					     (vk-surface-format-khr-format surface-format)
+					     (vk-surface-format-khr-color-space surface-format)
+					     (swapchain-details-extent swapchain-details)
+					     1
+					     vk-image-usage-color-attachment-bit
+					     vk-sharing-mode-exclusive
+					     2
+					     queue-indices-ptr
+					     ;; current transform for no transform
+					     (vk-surface-capabilities-current-transform
+					      capabilities)
+					     vk-composite-alpha-opaque-bit-khr
+					     (read-int
+					      (swapchain-details-present-mode swapchain-details))
+					     1 ;; enable clipping
+					     0))))
+
+    (let ((swapchain (make-foreign-object vk-swapchain))
+	  (swapchain-details (query-swapchain-details physical-device surface)))
+      (vk-create-swapchain-khr device (create-swapchain-info swapchain-details) 0 swapchain)
+      swapchain)))
+
+
 #!eof
 
 (load "vulkan/swapchain.scm")
 (define surface-ptr (window-details-surface window-obj))
-(define capabilities (get-capabilities physical-device-ptr
-				       (window-details-surface window-obj)))
+
+(define capabilities (get-capabilities physical-device-ptr surface-ptr))
 
 
 (define surface-formats (get-surface-formats physical-device-ptr surface-ptr))
@@ -91,4 +136,15 @@
 
 (choose-swapchain-settings surface-formats present-modes)
 
-(query-swapchain-details physical-device-ptr surface-ptr)
+
+
+(vk-surface-capabilities-min-image-count capabilities)
+
+
+(create-swapchain physical-device-ptr device-ptr surface-ptr queue-index)
+
+
+
+(vk-surface-capabilities-current-transform (swapchain-details-capabilities swapchain-details))
+;; fix height and width settings
+(vk-extent-2d-height (swapchain-details-extent swapchain-details))

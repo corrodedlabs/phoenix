@@ -247,7 +247,7 @@
 		     (cond
 		      ((= i (array-pointer-length arr-ptr)) (reverse xs))
 
-		      (else (lp (1+ i)
+		      (else (lp (fx+ 1 i)
 				(cons (f (ftype-&ref pointer-type
 						     ()
 						     (array-pointer-raw-ptr arr-ptr)
@@ -266,7 +266,7 @@
 						 i)))
 			      (if (f e)
 				  e
-				  (lp (1+ i)))))))))
+				  (lp (fx+ 1 i)))))))))
 
 	       (define car-lambda
 		 (lambda (arr-ptr)
@@ -280,6 +280,10 @@
   (trace-define-syntax define-foreign-struct
     (lambda (stx)
 
+      ;; this contains a map of struct-name and its members as a compile time property
+      ;; this is generated from this macro for each struct using define-property
+      ;;
+      ;; used for generating nested setters and getters for ftypes
       (define struct-info)
       
       (define construct-make-def
@@ -306,15 +310,19 @@
 		       ;; member of a member is also a struct,
 		       ;;
 		       ;; hence,only scalar and pointer value can be set for a member
-		       (member-info (map (lambda (member-spec)
-					   (with-syntax ((field-name (datum->syntax
-								      #'name
-								      (car member-spec))))
-					     #'(ftype-set! struct-name
-							   (name field-name)
-							   obj
-							   val-expr)))
-					 (cdr member-info)))
+		       (member-info
+			(map (lambda (member-spec)
+			       (with-syntax* ((field-name (datum->syntax #'name
+									 (car member-spec)))
+					      (field-getter (construct-name #'name
+									    #'type
+									    "-"
+									    #'field-name)))
+				 #'(ftype-set! struct-name
+					       (name field-name)
+					       obj
+					       (field-getter val-expr))))
+			     (cdr member-info)))
 		       (else (list #'(ftype-set! struct-name (name) obj val-expr))))))))
 	      
 	      (with-syntax* ((struct-name struct-name)

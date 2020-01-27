@@ -1,10 +1,3 @@
-(define validation? #t)
-(define *validation-extension* "VK_EXT_debug_utils")
-
-(define *validation-layers-info*
-  (cond
-   (validation? (cons 1 (strings->ptr (list *validation-layer*))))
-   (else (cons 0 #f))))
 
 (define (VK_MAKE_VERSION major minor patch)
   (logor (ash major 22) (ash minor 12) (ash patch 0)))
@@ -22,6 +15,15 @@
 
 
 (define *validation-layer* "VK_LAYER_KHRONOS_validation")
+
+(define validation? #t)
+(define *validation-extension* "VK_EXT_debug_utils")
+
+(define *validation-layers-info*
+  (cond
+   (validation? (cons 1 (strings->ptr (list *validation-layer*))))
+   (else (cons 0 #f))))
+
 
 ;; Structure definition
 ;;
@@ -104,15 +106,11 @@
 						      0
 						      0
 						      app-info
-						      ;; 0 #f
 						      (car *validation-layers-info*)
 						      (ftype-pointer-address
 						       (cdr *validation-layers-info*))
-						      ;; 0 #f
 						      (car extensions)
 						      (ftype-pointer-address (cdr extensions)))))
-    (write (ptr->strings layers-info))
-    (write (format "layers info cdr is \n"))
     (create-instance instance-info)))
 
 (define debug-callback

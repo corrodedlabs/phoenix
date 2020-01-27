@@ -2,11 +2,11 @@
 
 (define get-queue-family-properties
   (lambda (physical-device)
-    (call-with-array-pointer vk-queue-family-properties
-			     (lambda (count-ptr array-ptr)
-			       (vkGetPhysicalDeviceQueueFamilyProperties physical-device
-									 count-ptr
-									 array-ptr)))))
+    (with-new-array-pointer vk-queue-family-properties
+			    (lambda (count-ptr array-ptr)
+			      (vkGetPhysicalDeviceQueueFamilyProperties physical-device
+									count-ptr
+									array-ptr)))))
 
 
 (define find-queue-family
@@ -34,11 +34,11 @@
     (let ((family-props-arr (get-queue-family-properties physical-device)))
       (let lp ((i 0))
 	(cond
-	 ((= i (car family-props-arr)) #f)
+	 ((= i (array-pointer-length family-props-arr)) #f)
 
 	 ((supported-queue-family? (ftype-&ref vk-queue-family-properties
 					       ()
-					       (cdr family-props-arr)
+					       (array-pointer-raw-ptr family-props-arr)
 					       i)
 				   i)
 	  i)

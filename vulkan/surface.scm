@@ -3,12 +3,12 @@
 
 (define-record-type window-details (fields window surface))
 
-(define-record-type dimension (width height))
+(define-record-type dimension (fields width height))
 
 (define create-surface
   (lambda (instance window)
-    (let ((surface (make-foreign-object vk-surface)))
-      (glfw-create-window-surface instance window 0 surface)
+    (let ((surface (make-foreign-object uptr)))
+      (glfw-create-window-surface instance window 0 (ftype-pointer-address surface))
       surface)))
 
 ;; creates a new window and returns a window-details record wrapping surface and window
@@ -34,6 +34,7 @@ experiments:
 
 (define v (load-shared-object "libvulkan.so.1"))
 
+(load "vulkan/enums.scm")
 (load "vulkan/ftype.scm")
 (load "vulkan/instance.scm")
 (define ins (init-vulkan))

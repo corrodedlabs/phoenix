@@ -20,29 +20,29 @@
        (foreign-callable-entry-point code)))))
 
 
-(define camel-case->kebab-case
-  (lambda (str)
-    (list->string
-     (let lp ((str (reverse (string->list str)))
-	      (i 0)
-	      (dest '()))
-       (cond
-	((null? str) (apply append dest)) 
-	
-	((and (char-upper-case? (car str))
-	    (< 1 (length str))
-	    (not (char-upper-case? (cadr str)))) (lp (cdr str)
-						   (1+ i)
-						   (cons (list #\- (char-downcase (car str)))
-							 dest)))
+(meta define camel-case->kebab-case
+      (lambda (str)
+	(list->string
+	 (let lp ((str (reverse (string->list str)))
+		  (i 0)
+		  (dest '()))
+	   (cond
+	    ((null? str) (apply append dest)) 
+	    
+	    ((and (char-upper-case? (car str))
+		(< 1 (length str))
+		(not (char-upper-case? (cadr str)))) (lp (cdr str)
+						       (1+ i)
+						       (cons (list #\- (char-downcase (car str)))
+							     dest)))
 
-	((char-upper-case? (car str)) (lp (cdr str)
-					  (1+ i)
-					  (cons (list (char-downcase (car str))) dest)))
-	
-	(else (lp (cdr str)
-		  (1+ i)
-		  (cons (list (car str)) dest))))))))
+	    ((char-upper-case? (car str)) (lp (cdr str)
+					      (1+ i)
+					      (cons (list (char-downcase (car str))) dest)))
+	    
+	    (else (lp (cdr str)
+		      (1+ i)
+		      (cons (list (car str)) dest))))))))
 
 
 (trace-define-syntax define-vulkan-command
@@ -192,7 +192,7 @@
 (define-ftype vk-surface uptr)
 
 ;; assumes libglfw is loaded
-(define-vulkan-command glfwCreateWindowSurface ((& vk-instance) uptr uptr (* vk-surface)))
+(define-vulkan-command glfwCreateWindowSurface ((& vk-instance) uptr uptr uptr))
 
 ;;;;;;;;;;;;;;;;;;;;;;
 ;; Physical Devices ;;
@@ -325,6 +325,52 @@
 (define-vulkan-command vkGetPhysicalDeviceSurfacePresentModesKHR
   ((& vk-physical-device) (& vk-surface) (* unsigned-32) (* vk-present-mode-khr)))
 
+(define-enum-ftype vk-composite-alpha-flag-bits-khr
+  (vk-composite-alpha-opaque-bit-khr  #x00000001)
+  (vk-composite-alpha-pre-multiplied-bit-khr  #x00000002)
+  (vk-composite-alpha-post-multiplied-bit-khr  #x00000004)
+  (vk-composite-alpha-inherit-bit-khr  #x00000008)
+  (vk-composite-alpha-flag-bits-max-enum-khr  #x7fffffff))
+
+(define-enum-ftype vk-image-usage-flag-bits
+  (vk-image-usage-transfer-src-bit  #x00000001)
+  (vk-image-usage-transfer-dst-bit  #x00000002)
+  (vk-image-usage-sampled-bit  #x00000004)
+  (vk-image-usage-storage-bit  #x00000008)
+  (vk-image-usage-color-attachment-bit  #x00000010)
+  (vk-image-usage-depth-stencil-attachment-bit  #x00000020)
+  (vk-image-usage-transient-attachment-bit  #x00000040)
+  (vk-image-usage-input-attachment-bit  #x00000080)
+  (vk-image-usage-shading-rate-image-bit-nv  #x00000100)
+  (vk-image-usage-fragment-density-map-bit-ext  #x00000200)
+  (vk-image-usage-flag-bits-max-enum  #x7fffffff))
+
+(define-enum-ftype vk-sharing-mode
+  vk-sharing-mode-exclusive
+  vk-sharing-mode-concurrent)
+
+(define-ftype vk-swapchain uptr)
+
+(define-vulkan-struct vk-swapchain-create-info-khr
+  ((flags . unsigned-32)
+   (surface .  uptr)
+   (min-image-count . unsigned-32)
+   (image-format . vk-format)
+   (image-color-space . vk-color-space-khr)
+   (image-extent . vk-extent-2d)
+   (image-array-layers . unsigned-32)
+   (image-usage . flags)
+   (image-sharing-mode . vk-sharing-mode)
+   (queue-family-index-count . unsigned-32)
+   (queue-family-indices . (* unsigned-32))
+   (pre-transform . vk-surface-transform-flag-bits)
+   (composite-alpha . vk-composite-alpha-flag-bits-khr)
+   (present-mode . vk-present-mode-khr)
+   (clipped . vk-bool32)
+   (old-swapchain . vk-swapchain)))
+
+(define-vulkan-command vkCreateSwapchainKHR
+  ((& vk-device) (* vk-swapchain-create-info-khr) uptr (* vk-swapchain)))
 
 #!eof
 

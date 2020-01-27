@@ -4,9 +4,9 @@
 
 (define get-physical-devices
   (lambda (instance)
-    (call-with-array-pointer vk-physical-device
-			     (lambda (count devices)
-			       (vk-enumerate-physical-devices instance count devices)))))
+    (with-new-array-pointer vk-physical-device
+			    (lambda (count devices)
+			      (vk-enumerate-physical-devices instance count devices)))))
 
 
 (define create-logical-device
@@ -45,7 +45,7 @@
 
 
 (define devices-arr (get-physical-devices ins))
-(define physical-device-ptr (cdr devices-arr))
+(define physical-device-ptr (array-pointer-raw-ptr devices-arr))
 
 (define queue-index (find-queue-family physical-device-ptr
 				       (window-details-surface window-obj)))
