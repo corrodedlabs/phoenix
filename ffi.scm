@@ -25,7 +25,8 @@
 	  array-pointer-raw-ptr
 	  array-pointer-empty?
 	  array-pointer?
-	  with-new-array-pointer)
+	  with-new-array-pointer
+	  pointer-ref-value)
 
   (import (chezscheme))
 
@@ -175,6 +176,10 @@
     (syntax-rules ()
       ((_ struct size) (make-ftype-pointer struct (unbox (malloc (* size
 								    (ftype-sizeof struct))))))))
+
+  (define-syntax pointer-ref-value
+    (syntax-rules ()
+      ((_ ptr) (foreign-ref 'uptr (ftype-pointer-address ptr) 0))))
 
   (meta define-syntax define-ptr-lambda 
 	(syntax-rules ()
@@ -421,7 +426,7 @@
 	   (let ((member-details (filter identity
 					 (map (lambda (type)
 						(let ((members (and (identifier? type)
-								  (lookup type #'struct-info))))
+								    (lookup type #'struct-info))))
 						  (cond
 						   (members
 						    (cons (syntax->datum type) members))

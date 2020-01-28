@@ -3,7 +3,8 @@
   (fields surface-format
 	  present-mode
 	  extent
-	  capabilities))
+	  capabilities
+	  (mutable swapchain)))
 
 (define choose-swapchain-settings
   (lambda (surface-formats present-modes surface-capabilities)
@@ -39,7 +40,8 @@
     (make-swapchain-details (choose-surface-format)
 			    (choose-present-modes)
 			    (choose-swapchain-extent)
-			    surface-capabilities)))
+			    surface-capabilities
+			    #f)))
 
 (define query-swapchain-details
   (lambda (physical-device surface)
@@ -91,9 +93,7 @@
 	  (make-vk-swapchain-create-info-khr swapchain-create-info-khr
 					     0
 					     0
-					     (foreign-ref 'uptr
-							  (ftype-pointer-address surface)
-							  0)
+					     (pointer-ref-value surface)
 					     (vk-surface-capabilities-max-image-count
 					      capabilities)
 					     (vk-surface-format-khr-format surface-format)
@@ -116,13 +116,40 @@
     (let ((swapchain (make-foreign-object vk-swapchain))
 	  (swapchain-details (query-swapchain-details physical-device surface)))
       (vk-create-swapchain-khr device (create-swapchain-info swapchain-details) 0 swapchain)
-      swapchain)))
+      (swapchain-details-swapchain-set! swapchain-details swapchain)
+      swapchain-details)))
 
-(define create-swapchain-image-views
+(define create-swapchain-images
   (lambda (device swapchain)
     (with-new-array-pointer vk-image
 			    (lambda (count images)
 			      (vk-get-swapchain-images-khr device swapchain count images)))))
+
+(define-collection-lambdas vk-image)
+
+(define create-swapchain-image-views
+  (lambda (device swapchain-details images)
+
+    (define create-swapchain-image-view-info
+      (lambda (image)
+	(let ((components (make-vk-component-mapping vk-component-swizzle-identity
+						     vk-component-swizzle-identity
+						     vk-component-swizzle-identity
+						     vk-component-swizzle-identity))
+	      (surface-format (swapchain-details-surface-format swapchain-details))
+	      (subresource-range (make-vk-image-subresource-range vk-image-aspect-color-bit
+								  0
+								  1
+								  0
+								  1)))
+	  (make-vk-image-view-create-info image-view-create-info 0 0
+					  (pointer-ref-value image)
+					  vk-image-view-type-2d
+					  (vk-surface-format-khr-format surface-format)
+					  components
+					  subresource-range))))
+
+    (vk-image-pointer-map create-swapchain-image-view-info images)))
 
 #!eof
 
@@ -157,10 +184,24 @@
 
 --- from vulkan state
 
-(define swapchain-images
-  (create-swapchain-image-views (vulkan-state-device vs) (vulkan-state-swapchain vs)))
 
+(vulkan-state-swapchain vs)
+
+(define swapchain-details-obj (create-swapchain (vulkan-state-physical-device vs)
+						(vulkan-state-device vs)
+						(vulkan-state-surface vs)
+						(vulkan-state-queue-index vs)))
+
+(define swapchain-images
+  (create-swapchain-image-views (vulkan-state-device vs)
+				(swapchain-details-swapchain swapchain-details-obj)))
 
 (array-pointer? swapchain-images)
 
 (array-pointer-length swapchain-images)
+
+
+(define swapchain-image-views
+  (create-swapchain-image-views (vulkan-state-device vs)
+				swapchain-details-obj
+				swapchain-images))

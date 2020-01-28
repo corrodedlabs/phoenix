@@ -36,8 +36,9 @@
 	   (queue-index (find-queue-family physical-device surface))
 	   (device (create-logical-device physical-device queue-index))
 	   (queues (create-queue-handles device))
-	   (swapchain (create-swapchain physical-device device surface queue-index)))
-      (make-vulkan-state window surface physical-device queue-index device queues swapchain))))
+	   (swapchain-details (create-swapchain physical-device device surface queue-index)))
+      (make-vulkan-state window surface physical-device queue-index device queues
+			 swapchain-detials))))
 
 
 

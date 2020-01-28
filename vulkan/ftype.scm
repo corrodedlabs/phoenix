@@ -377,6 +377,70 @@
 (define-vulkan-command vkGetSwapchainImagesKHR
   ((& vk-device) (& vk-swapchain) (* unsigned-32) (* vk-image)))
 
+;; swapchain image views
+
+(define-enum-ftype vk-image-view-create-flag-bits
+  (vk-image-view-create-fragment-density-map-dynamic-bit-ext #x00000001)
+  (vk-image-view-create-flag-bits-max-enum #x7fffffff))
+
+(define-enum-ftype vk-image-view-type
+  vk-image-view-type-1d
+  vk-image-view-type-2d
+  vk-image-view-type-3d
+  vk-image-view-type-cube
+  vk-image-view-type-1d-array
+  vk-image-view-type-2d-array
+  vk-image-view-type-cube-array)
+
+(define-enum-ftype vk-component-swizzle
+  vk-component-swizzle-identity
+  vk-component-swizzle-zero
+  vk-component-swizzle-one
+  vk-component-swizzle-r
+  vk-component-swizzle-g
+  vk-component-swizzle-b
+  vk-component-swizzle-a)
+
+(define-foreign-struct vk-component-mapping
+  ((r . vk-component-swizzle)
+   (g . vk-component-swizzle)
+   (b . vk-component-swizzle)
+   (a . vk-component-swizzle)))
+
+(define-enum-ftype vk-image-aspect-flag-bits
+  (vk-image-aspect-color-bit #x00000001)
+  (vk-image-aspect-depth-bit  #x00000002)
+  (vk-image-aspect-stencil-bit  #x00000004)
+  (vk-image-aspect-metadata-bit #x00000008)
+  (vk-image-aspect-plane-0-bit  #x00000010)
+  (vk-image-aspect-plane-1-bit  #x00000020)
+  (vk-image-aspect-plane-2-bit  #x00000040)
+  (vk-image-aspect-memory-plane-0-bit-ext  #x00000080)
+  (vk-image-aspect-memory-plane-1-bit-ext  #x00000100)
+  (vk-image-aspect-memory-plane-2-bit-ext  #x00000200)
+  (vk-image-aspect-memory-plane-3-bit-ext  #x00000400))
+
+(define-foreign-struct vk-image-subresource-range
+  ((aspect-mask . flags)
+   (base-mip-level . unsigned-32)
+   (level-count . unsigned-32)
+   (base-array-layer . unsigned-32)
+   (layer-count . unsigned-32)))
+
+(define-vulkan-struct vk-image-view-create-info
+  ((flags . flags)
+   (image . vk-image)
+   (view-type . vk-image-view-type)
+   (format . vk-format)
+   (components . vk-component-mapping)
+   (sub-resource-range . vk-image-subresource-range)))
+
+(define-ftype vk-image-view uptr)
+
+(define-vulkan-command vkCreateImageView
+  ((& vk-device) (* vk-image-view-create-info) uptr (* vk-image-view)))
+
+
 #!eof
 
 --------------------------------------------
