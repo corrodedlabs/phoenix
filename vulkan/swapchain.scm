@@ -118,6 +118,11 @@
       (vk-create-swapchain-khr device (create-swapchain-info swapchain-details) 0 swapchain)
       swapchain)))
 
+(define create-swapchain-image-views
+  (lambda (device swapchain)
+    (with-new-array-pointer vk-image
+			    (lambda (count images)
+			      (vk-get-swapchain-images-khr device swapchain count images)))))
 
 #!eof
 
@@ -148,3 +153,14 @@
 (vk-surface-capabilities-current-transform (swapchain-details-capabilities swapchain-details))
 ;; fix height and width settings
 (vk-extent-2d-height (swapchain-details-extent swapchain-details))
+
+
+--- from vulkan state
+
+(define swapchain-images
+  (create-swapchain-image-views (vulkan-state-device vs) (vulkan-state-swapchain vs)))
+
+
+(array-pointer? swapchain-images)
+
+(array-pointer-length swapchain-images)

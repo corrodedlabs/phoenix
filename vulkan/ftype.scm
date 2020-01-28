@@ -372,6 +372,11 @@
 (define-vulkan-command vkCreateSwapchainKHR
   ((& vk-device) (* vk-swapchain-create-info-khr) uptr (* vk-swapchain)))
 
+(define-ftype vk-image uptr)
+
+(define-vulkan-command vkGetSwapchainImagesKHR
+  ((& vk-device) (& vk-swapchain) (* unsigned-32) (* vk-image)))
+
 #!eof
 
 --------------------------------------------

@@ -22,21 +22,22 @@
        (load "vulkan/devices.scm")
        (load "vulkan/swapchain.scm"))
 
+(define-record-type vulkan-state
+  (fields window surface physical-device queue-index device queues swapchain))
+
 
 (define setup-vulkan
   (lambda ()
     (let* ((instance (init-vulkan))
 	   (_ (glfw-init))
 	   (window  (setup-window instance 1366 768))
+	   (surface (window-details-surface window))
 	   (physical-device (array-pointer-raw-ptr (get-physical-devices instance)))
-	   (queue-index (find-queue-family physical-device
-					   (window-details-surface window)))
+	   (queue-index (find-queue-family physical-device surface))
 	   (device (create-logical-device physical-device queue-index))
 	   (queues (create-queue-handles device))
-	   )
-      (create-swapchain physical-device device (window-details-surface window) queue-index)
-      (display "all done")
-      (newline))))
+	   (swapchain (create-swapchain physical-device device surface queue-index)))
+      (make-vulkan-state window surface physical-device queue-index device queues swapchain))))
 
 
 
