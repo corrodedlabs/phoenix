@@ -6,6 +6,7 @@
 
 (import (ffi)
 	(glfw)
+	(shaderc)
 	(vulkan structure-types))
 
 

@@ -440,6 +440,46 @@
 (define-vulkan-command vkCreateImageView
   ((& vk-device) (* vk-image-view-create-info) uptr (* vk-image-view)))
 
+;;;;;;;;;;;;;;;;;;;;;;;
+;; Graphics Pipeline ;;
+;;;;;;;;;;;;;;;;;;;;;;;
+
+(define-ftype vk-shader-module uptr)
+
+(define-vulkan-struct vk-shader-module-create-info
+  ((flags . flags)
+   (code-size . size_t)
+   (code . (* unsigned-32))))
+
+(define-vulkan-command vkCreateShaderModule
+  ((& vk-device) (* vk-shader-module-create-info) uptr (* vk-shader-module)))
+
+(define-enum-ftype vk-shader-stage-flag-bits
+  (vk-shader-stage-vertex-bit  #x00000001)
+  (vk-shader-stage-tessellation-control-bit  #x00000002)
+  (vk-shader-stage-tessellation-evaluation-bit  #x00000004)
+  (vk-shader-stage-geometry-bit  #x00000008)
+  (vk-shader-stage-fragment-bit  #x00000010)
+  (vk-shader-stage-compute-bit  #x00000020)
+  (vk-shader-stage-all-graphics  #x0000001f)
+  (vk-shader-stage-all  #x7fffffff)
+  (vk-shader-stage-raygen-bit-nv  #x00000100)
+  (vk-shader-stage-any-hit-bit-nv  #x00000200)
+  (vk-shader-stage-closest-hit-bit-nv  #x00000400)
+  (vk-shader-stage-miss-bit-nv  #x00000800)
+  (vk-shader-stage-intersection-bit-nv  #x00001000)
+  (vk-shader-stage-callable-bit-nv  #x00002000)
+  (vk-shader-stage-task-bit-nv  #x00000040)
+  (vk-shader-stage-mesh-bit-nv  #x00000080)
+  (vk-shader-stage-flag-bits-max-enum  #x7fffffff))
+
+(define-vulkan-struct vk-pipeline-shader-stage-create-info
+  ((flags . flags)
+   (stage . vk-shader-stage-flag-bits)
+   (module . vk-shader-module)
+   (name . uptr)
+   ;; todo add specialization info when needed
+   (specialization-info . uptr)))
 
 #!eof
 
