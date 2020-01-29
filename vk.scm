@@ -2,6 +2,7 @@
 ;; (load "vulkan/structure-types.scm")
 ;; (load "ffi.scm")
 
+(library-directories '("./thunderchez" "."))
 
 (import (ffi)
 	(glfw)
