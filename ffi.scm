@@ -242,8 +242,14 @@
 						   #'pointer-type "-pointer-map"))
 		       (find-lambda (construct-name #'pointer-type
 						    #'pointer-type "-pointer-find"))
+		       (for-each-lambda (construct-name #'pointer-type
+							#'pointer-type "-pointer-for-each"))
 		       (car-lambda (construct-name #'pointer-type
-						   #'pointer-type "-pointer-car")))
+						   #'pointer-type "-pointer-car"))
+		       (list->array-pointer-lambda (construct-name #'pointer-type
+								   "list->"
+								   #'pointer-type
+								   "-pointer-array")))
 	   #'(begin
 	       (define map-lambda
 		 (lambda (f arr-ptr)
@@ -277,7 +283,43 @@
 		 (lambda (arr-ptr)
 		   (if (> 1 (array-pointer-length arr-ptr))
 		       #f
-		       (array-pointer-raw-ptr arr-ptr))))))])))
+		       (array-pointer-raw-ptr arr-ptr))))
+
+	       (define for-each-lambda
+		 (lambda (f arr-ptr)
+		   (let lp ((i 0))
+		     (cond
+		      ((= i (array-pointer-length arr-ptr)) arr-ptr)
+
+		      (else (begin (f (ftype-&ref pointer-type
+						  ()
+						  (array-pointer-raw-ptr arr-ptr)
+						  i))
+				   (lp (fx+ 1 i))))))))
+
+	       (define list->array-pointer-lambda
+		 (lambda (xs)
+		   (let* ((size (length xs))
+			  (arr (make-ftype-pointer uptr
+						   (unbox (malloc (* (ftype-sizeof uptr)
+								     size))))))
+		     (let lp ((i 0)
+			      (xs xs))
+		       (cond
+			((or (null? xs) (= i size))
+			 (make-array-pointer size
+					     (make-ftype-pointer pointer-type
+								 (ftype-pointer-address arr))
+					     
+					     (quote pointer-type)))
+
+			(else (begin (ftype-set! uptr
+						 ()
+						 arr
+						 i
+						 (ftype-pointer-address (car xs)))
+				     (lp (fx+ 1 i)
+					 (cdr xs)))))))))))])))
   
 
 
@@ -426,7 +468,7 @@
 	   (let ((member-details (filter identity
 					 (map (lambda (type)
 						(let ((members (and (identifier? type)
-								    (lookup type #'struct-info))))
+								  (lookup type #'struct-info))))
 						  (cond
 						   (members
 						    (cons (syntax->datum type) members))

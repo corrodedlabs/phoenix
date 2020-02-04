@@ -7,6 +7,9 @@
 (import (ffi)
 	(glfw)
 	(shaderc)
+
+	(srfi s43 vectors)
+	
 	(vulkan structure-types))
 
 
@@ -40,11 +43,13 @@
 	   (queues (create-queue-handles device))
 	   (swapchain-details (create-swapchain physical-device device surface queue-index)))
       (make-vulkan-state window surface physical-device queue-index device queues
-			 swapchain-detials))))
+			 swapchain-details))))
 
 
 
-
+;; (load "ffi.scm")
+;; (import (ffi))
+;; (load "vulkan/ftype.scm")
 
 
 

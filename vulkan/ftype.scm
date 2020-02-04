@@ -444,6 +444,8 @@
 ;; Graphics Pipeline ;;
 ;;;;;;;;;;;;;;;;;;;;;;;
 
+;; shader stages
+
 (define-ftype vk-shader-module uptr)
 
 (define-vulkan-struct vk-shader-module-create-info
@@ -480,6 +482,33 @@
    (name . uptr)
    ;; todo add specialization info when needed
    (specialization-info . uptr)))
+
+;; vertex input
+
+(define-enum-ftype vk-vertex-input-rate
+  vk-vertex-input-rate-vertex
+  vk-vertex-input-rate-instance)
+
+
+(define-foreign-struct vk-vertex-input-binding-description
+  ((binding . unsigned-32)
+   (stride . unsigned-32)
+   (input-rate . vk-vertex-input-rate)))
+
+(define-foreign-struct vk-vertex-input-attribute-description
+  ((location . unsigned-32)
+   (binding . unsigned-32)
+   (format . vk-format)
+   (offset . unsigned-32)))
+
+(define-collection-lambdas vk-vertex-input-attribute-description)
+
+(define-vulkan-struct vk-pipeline-vertex-input-state-create-info
+  ((flags . flags)
+   (vertex-bindings-description-count . unsigned-32)
+   (vertex-bindings-descriptions . (* vk-vertex-input-binding-description))
+   (vertex-attribute-description-count . unsigned-32)
+   (vertex-attribute-descriptions . (* vk-vertex-input-attribute-description))))
 
 #!eof
 

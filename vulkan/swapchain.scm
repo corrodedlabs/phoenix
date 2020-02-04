@@ -183,7 +183,7 @@
 
 
 --- from vulkan state
-
+(define vs (setup-vulkan))
 
 (vulkan-state-swapchain vs)
 
@@ -193,8 +193,8 @@
 						(vulkan-state-queue-index vs)))
 
 (define swapchain-images
-  (create-swapchain-image-views (vulkan-state-device vs)
-				(swapchain-details-swapchain swapchain-details-obj)))
+  (create-swapchain-images (vulkan-state-device vs)
+			   (swapchain-details-swapchain swapchain-details-obj)))
 
 (array-pointer? swapchain-images)
 
