@@ -126,6 +126,35 @@
 						     (make-attribute-descriptions))))
 
 
+;; input assembly
+
+(define create-pipeline-assembly-state
+  (lambda ()
+    (make-vk-pipeline-input-assembly-state-create-info pipeline-input-assembly-state-create-info 0 0
+						       vk-primitive-topology-triangle-list
+						       vk-false)))
+
+;; viewport
+
+(define (create-viewport-info swapchain-extent)
+
+  (define (create-viewport)
+    (make-vk-viewport 0.0
+		      0.0
+		      (exact->inexact (vk-extent-2d-width swapchain-extent))
+		      (exact->inexact (vk-extent-2d-height swapchain-extent))
+		      0.0
+		      1.0))
+
+  (define (create-scissor)
+    (make-vk-rect-2d (make-vk-offset-2d 0 0) swapchain-extent))
+
+  (make-vk-pipeline-viewport-state-create-info pipeline-viewport-state-create-info 0 0
+					       1
+					       (create-viewport)
+					       1
+					       (create-scissor)))
+
 #!eof
 
 (load "vulkan/pipeline.scm")
@@ -151,3 +180,7 @@
 (define attrs (vertex-input->attrs (car vertices)))
 
 (define vertex-input-create-info (create-vertex-input stride attrs))
+
+(define swapchain-extent (swapchain-details-extent (vulkan-state-swapchain vs)))
+
+(create-viewport-info swapchain-extent)

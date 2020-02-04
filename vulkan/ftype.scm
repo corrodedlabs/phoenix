@@ -10,7 +10,10 @@
 
 (define-ftype uint32-t unsigned-32)
 (define-ftype flags uint32-t)
+
 (define-ftype vk-bool32 unsigned-32)
+(define vk-true 1)
+(define vk-false 0)
 
 (define-syntax callback
   (syntax-rules ()
@@ -509,6 +512,48 @@
    (vertex-bindings-descriptions . (* vk-vertex-input-binding-description))
    (vertex-attribute-description-count . unsigned-32)
    (vertex-attribute-descriptions . (* vk-vertex-input-attribute-description))))
+
+;; pipeline input assembly state
+
+(define-enum-ftype vk-primitive-topology
+  vk-primitive-topology-point-list
+  vk-primitive-topology-line-list
+  vk-primitive-topology-line-strip
+  vk-primitive-topology-triangle-list
+  vk-primitive-topology-triangle-strip
+  vk-primitive-topology-triangle-fan
+  vk-primitive-topology-line-list-with-adjacency
+  vk-primitive-topology-line-strip-with-adjacency
+  vk-primitive-topology-triangle-list-with-adjacency
+  vk-primitive-topology-triangle-strip-with-adjacency
+  vk-primitive-topology-patch-list)
+
+
+(define-vulkan-struct vk-pipeline-input-assembly-state-create-info
+  ((flags . flags)
+   (topology . vk-primitive-topology)
+   (primitive-restart-enabled . unsigned-32)))
+
+;; viewports
+
+(define-foreign-struct vk-viewport
+  ((x . float)
+   (y . float)
+   (width . float)
+   (height . float)
+   (min-depth . float)
+   (max-depth . float)))
+
+(define-foreign-struct vk-offset-2d  ((x . unsigned-32) (y . unsigned-32)))
+
+(define-foreign-struct vk-rect-2d ((offset . vk-offset-2d) (extent . vk-extent-2d)))
+
+(define-vulkan-struct vk-pipeline-viewport-state-create-info
+  ((flags . flags)
+   (viewport-count . unsigned-32)
+   (viewports . (* vk-viewport))
+   (scissor-count . unsigned-32)
+   (scissors . (* vk-rect-2d))))
 
 #!eof
 

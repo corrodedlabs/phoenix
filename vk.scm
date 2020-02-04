@@ -46,10 +46,14 @@
 			 swapchain-details))))
 
 
+#!eof
 
-;; (load "ffi.scm")
-;; (import (ffi))
-;; (load "vulkan/ftype.scm")
+
+> (load "ffi.scm")
+> (import (ffi))
+> (load "vulkan/ftype.scm")
+
+> (define vs (setup-vulkan))
 
 
 

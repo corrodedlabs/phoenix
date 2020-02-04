@@ -28,7 +28,7 @@
 
     (define choose-swapchain-extent
       (lambda ()
-	;; todo this should ideally be:
+	x	;; todo this should ideally be:
 	;; max(capabilities.minImageExtent.width,
  	;; min(capabilities.maxImageExtent.width, actualExtent.width));
 	;; actualExtent comes from window dimension
