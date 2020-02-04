@@ -155,6 +155,23 @@
 					       1
 					       (create-scissor)))
 
+;; rasterizer
+
+(define (create-rasterizer-info)
+  (make-vk-pipeline-rasterization-state-create-info pipeline-rasterization-state-create-info
+						    0
+						    0
+						    vk-false
+						    vk-false
+						    vk-polygon-mode-fill
+						    vk-cull-mode-back-bit
+						    vk-front-face-counter-clockwise
+						    vk-false
+						    0.0
+						    0.0
+						    0.0
+						    1.0))
+
 #!eof
 
 (load "vulkan/pipeline.scm")

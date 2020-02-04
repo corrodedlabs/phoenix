@@ -555,6 +555,41 @@
    (scissor-count . unsigned-32)
    (scissors . (* vk-rect-2d))))
 
+;; rasterizer
+
+(define-enum-ftype vk-polygon-mode
+  vk-polygon-mode-fill
+  vk-polygon-mode-line
+  vk-polygon-mode-point
+  (vk-polygon-mode-fill-rectangle-nv 1000153000)
+  ;; todo some values are missing here
+  )
+
+(define-enum-ftype vk-cull-mode-flag-bits
+  vk-cull-mode-none
+  (vk-cull-mode-front-bit #x00000001)
+  (vk-cull-mode-back-bit #x00000002)
+  (vk-cull-mode-front-and-back #x00000003))
+
+(define-enum-ftype vk-front-face
+  vk-front-face-counter-clockwise
+  vk-front-face-clockwise
+  ;;todo more here
+  )
+
+(define-vulkan-struct vk-pipeline-rasterization-state-create-info
+  ((flags . flags)
+   (depth-clamp-enable . unsigned-32)
+   (rasterizer-discard-enable . unsigned-32)
+   (polygon-mode . vk-polygon-mode)
+   (cull-mode . flags)
+   (front-face . vk-front-face)
+   (depth-bias-enable . unsigned-32)
+   (depth-bias-constant-factor . float)
+   (depth-bias-clamp . float)
+   (depth-bias-slope-factor . float)
+   (line-width . float)))
+
 #!eof
 
 --------------------------------------------
