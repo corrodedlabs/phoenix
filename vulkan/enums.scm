@@ -411,3 +411,23 @@
   vk-logic-op-or-inverted
   vk-logic-op-nand
   vk-logic-op-set)
+
+(define-enum-ftype vk-compare-op
+  (vk-compare-op-never  0)
+  (vk-compare-op-less  1)
+  (vk-compare-op-equal  2)
+  (vk-compare-op-less-or-equal  3)
+  (vk-compare-op-greater  4)
+  (vk-compare-op-not-equal  5)
+  (vk-compare-op-greater-or-equal  6)
+  (vk-compare-op-always  7))
+
+(define-enum-ftype vk-stencil-op
+  (vk-stencil-op-keep  0)
+  (vk-stencil-op-zero  1)
+  (vk-stencil-op-replace  2)
+  (vk-stencil-op-increment-and-clamp  3)
+  (vk-stencil-op-decrement-and-clamp  4)
+  (vk-stencil-op-invert  5)
+  (vk-stencil-op-increment-and-wrap  6)
+  (vk-stencil-op-decrement-and-wrap  7))
