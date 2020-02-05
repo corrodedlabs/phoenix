@@ -316,3 +316,98 @@
   ;; vk-colorspace-srgb-nonlinear-khr  vk-color-space-srgb-nonlinear-khr)
   ;; vk-color-space-dci-p3-linear-ext  vk-color-space-display-p3-linear-ext)
   (vk-color-space-max-enum-khr  #x7fffffff))
+
+
+;; color blending enums
+
+(define-enum-ftype vk-blend-factor
+  (vk-blend-factor-zero  0)
+  (vk-blend-factor-one  1)
+  (vk-blend-factor-src-color  2)
+  (vk-blend-factor-one-minus-src-color  3)
+  (vk-blend-factor-dst-color  4)
+  (vk-blend-factor-one-minus-dst-color  5)
+  (vk-blend-factor-src-alpha  6)
+  (vk-blend-factor-one-minus-src-alpha  7)
+  (vk-blend-factor-dst-alpha  8)
+  (vk-blend-factor-one-minus-dst-alpha  9)
+  (vk-blend-factor-constant-color  10)
+  (vk-blend-factor-one-minus-constant-color  11)
+  (vk-blend-factor-constant-alpha  12)
+  (vk-blend-factor-one-minus-constant-alpha  13)
+  (vk-blend-factor-src-alpha-saturate  14)
+  (vk-blend-factor-src1-color  15)
+  (vk-blend-factor-one-minus-src1-color  16)
+  (vk-blend-factor-src1-alpha  17)
+  (vk-blend-factor-one-minus-src1-alpha 18))
+
+(define-enum-ftype vk-blend-op
+  (vk-blend-op-add  0)
+  (vk-blend-op-subtract  1)
+  (vk-blend-op-reverse-subtract  2)
+  (vk-blend-op-min  3)
+  (vk-blend-op-max  4)
+  (vk-blend-op-zero-ext  1000148000)
+  (vk-blend-op-src-ext  1000148001)
+  (vk-blend-op-dst-ext  1000148002)
+  (vk-blend-op-src-over-ext  1000148003)
+  (vk-blend-op-dst-over-ext  1000148004)
+  (vk-blend-op-src-in-ext  1000148005)
+  (vk-blend-op-dst-in-ext  1000148006)
+  (vk-blend-op-src-out-ext  1000148007)
+  (vk-blend-op-dst-out-ext  1000148008)
+  (vk-blend-op-src-atop-ext  1000148009)
+  (vk-blend-op-dst-atop-ext  1000148010)
+  (vk-blend-op-xor-ext  1000148011)
+  (vk-blend-op-multiply-ext  1000148012)
+  (vk-blend-op-screen-ext  1000148013)
+  (vk-blend-op-overlay-ext  1000148014)
+  (vk-blend-op-darken-ext  1000148015)
+  (vk-blend-op-lighten-ext  1000148016)
+  (vk-blend-op-colordodge-ext  1000148017)
+  (vk-blend-op-colorburn-ext  1000148018)
+  (vk-blend-op-hardlight-ext  1000148019)
+  (vk-blend-op-softlight-ext  1000148020)
+  (vk-blend-op-difference-ext  1000148021)
+  (vk-blend-op-exclusion-ext  1000148022)
+  (vk-blend-op-invert-ext  1000148023)
+  (vk-blend-op-invert-rgb-ext  1000148024)
+  (vk-blend-op-lineardodge-ext  1000148025)
+  (vk-blend-op-linearburn-ext  1000148026)
+  (vk-blend-op-vividlight-ext  1000148027)
+  (vk-blend-op-linearlight-ext  1000148028)
+  (vk-blend-op-pinlight-ext  1000148029)
+  (vk-blend-op-hardmix-ext  1000148030)
+  (vk-blend-op-hsl-hue-ext  1000148031)
+  (vk-blend-op-hsl-saturation-ext  1000148032)
+  (vk-blend-op-hsl-color-ext  1000148033)
+  (vk-blend-op-hsl-luminosity-ext  1000148034)
+  (vk-blend-op-plus-ext  1000148035)
+  (vk-blend-op-plus-clamped-ext  1000148036)
+  (vk-blend-op-plus-clamped-alpha-ext  1000148037)
+  (vk-blend-op-plus-darker-ext  1000148038)
+  (vk-blend-op-minus-ext  1000148039)
+  (vk-blend-op-minus-clamped-ext  1000148040)
+  (vk-blend-op-contrast-ext  1000148041)
+  (vk-blend-op-invert-ovg-ext  1000148042)
+  (vk-blend-op-red-ext  1000148043)
+  (vk-blend-op-green-ext  1000148044)
+  (vk-blend-op-blue-ext  1000148045))
+
+(define-enum-ftype vk-logic-op
+  vk-logic-op-clear
+  vk-logic-op-and
+  vk-logic-op-and-reverse
+  vk-logic-op-copy
+  vk-logic-op-and-inverted
+  vk-logic-op-no-op
+  vk-logic-op-xor
+  vk-logic-op-or
+  vk-logic-op-nor
+  vk-logic-op-equivalent
+  vk-logic-op-invert
+  vk-logic-op-or-reverse
+  vk-logic-op-copy-inverted
+  vk-logic-op-or-inverted
+  vk-logic-op-nand
+  vk-logic-op-set)

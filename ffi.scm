@@ -28,20 +28,11 @@
 	  with-new-array-pointer
 	  pointer-ref-value)
 
-  (import (chezscheme))
+  (import (chezscheme)
+	  (prelude))
 
   (define libc (load-shared-object "libc.so.6"))
 
-  (meta define identity (lambda (x) x))
-
-  (meta define construct-name
-	(lambda (template-identifier . args)
-	  (datum->syntax template-identifier
-			 (string->symbol (apply string-append (map (lambda (x)
-								     (if (string? x)
-									 x
-									 (symbol->string (syntax->datum x))))
-								   args))))))
   
   (define-condition-type &ffi-condition &condition
     ffi-condition ffi-condition?
@@ -332,11 +323,17 @@
       ;;
       ;; used for generating nested setters and getters for ftypes
       (define struct-info)
+
+      (define array-type?
+	(lambda (type)
+	  (and (list? type)
+	     (fx=? (length type) 3)
+	     (equal? 'array (car type))
+	     (number? (cadr type)))))
       
       (define construct-make-def
 	(lambda (struct-name member-spec member-details)
 	  (define scalar-type '(unsigned-32 int uptr))
-
 	  
 	  ;; generates the setter expression for a type
 	  (define struct-set-syntax
@@ -349,7 +346,8 @@
 				(name name)
 				(type type)
 				(val-expr val-expr))
-		    (let ((member-info (assoc (syntax->datum #'type) member-details)))
+		    (let* ((type-sym (syntax->datum #'type))
+			   (member-info (assoc type-sym member-details)))
 		      
 		      (cond
 		       ;; currently handling only one level of nesting
@@ -370,6 +368,14 @@
 					       obj
 					       (field-getter val-expr))))
 			     (cdr member-info)))
+
+		       ;; array type
+		       ;; val-expr is expected to be a list
+		       ((array-type? type-sym)
+			#'(map-indexed (lambda (val i)
+					 (ftype-set! struct-name (name i) obj val))
+				       val-expr))
+		       
 		       (else (list #'(ftype-set! struct-name (name) obj val-expr))))))))
 	      
 	      (with-syntax* ((struct-name struct-name)
@@ -430,7 +436,8 @@
 	    (map (lambda (member)
 		   (with-syntax* ((name (car member))
 				  (type (cdr member)))
-		     (let ((member-types (assoc (syntax->datum #'type) member-details)))
+		     (let* ((type-sym (syntax->datum #'type))
+			    (member-types (assoc type-sym member-details)))
 		       (cond
 
 			;; getters for struct fields
@@ -451,6 +458,19 @@
 									       #'field-name))))
 					      (cdr member-types))))
 			   #'(begin getters ...)))
+
+			;; array types
+			((array-type? type-sym)
+			 (with-syntax ((size (datum->syntax #'name (cadr type-sym)))
+				       (lambda-name (construct-name #'name
+								    #'struct-name "-" #'name)))
+			   #'(define lambda-name
+			       (lambda (ptr)
+				 (if (ftype-pointer? struct-name ptr)
+				     (map (lambda (i)
+					    (ftype-ref struct-name (name i) ptr))
+					  (iota size))
+				     (raise (ffi-condition "invalid pointer" ptr lambda-name)))))))
 
 			;; scalar / pointer getters
 			(else (construct-ptr-lambdas #'name (list #'name)))))))

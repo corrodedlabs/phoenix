@@ -4,7 +4,9 @@
 
 (library-directories '("./thunderchez" "."))
 
-(import (ffi)
+(import (prelude)
+
+	(ffi)
 	(glfw)
 	(shaderc)
 
