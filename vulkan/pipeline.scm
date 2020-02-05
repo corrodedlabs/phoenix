@@ -191,6 +191,20 @@
 						    color-attachment
 						    '(0.0 0.0 0.0 0.0))))
 
+;; pipeline layout
+
+(define (create-pipeline-layout device)
+  (let ((layout-info (make-vk-pipeline-layout-create-info pipeline-layout-create-info 0 0
+							  0
+							  (null-pointer vk-descriptor-set-layout)
+							  0
+							  (null-pointer vk-push-constant-range)))
+	(layout (make-foreign-object vk-pipeline-layout)))
+    (vk-create-pipeline-layout device layout-info 0 layout)
+    layout))
+
+
+
 #!eof
 
 (load "vulkan/pipeline.scm")
@@ -220,3 +234,5 @@
 (define swapchain-extent (swapchain-details-extent (vulkan-state-swapchain vs)))
 
 (create-viewport-info swapchain-extent)
+
+(create-pipeline-layout (vulkan-state-device vs))

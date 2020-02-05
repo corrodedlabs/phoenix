@@ -18,6 +18,7 @@
 	  define-enum-ftype
 	  cstring
 	  construct-name
+	  null-pointer
 
 	  define-collection-lambdas
 	  make-array-pointer
@@ -171,6 +172,10 @@
   (define-syntax pointer-ref-value
     (syntax-rules ()
       ((_ ptr) (foreign-ref 'uptr (ftype-pointer-address ptr) 0))))
+
+  (define-syntax null-pointer
+    (syntax-rules ()
+      ((_ type) (make-ftype-pointer type 0))))
 
   (meta define-syntax define-ptr-lambda 
 	(syntax-rules ()

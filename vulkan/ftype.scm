@@ -641,6 +641,61 @@
    (blend-constants . (array 4 float))))
 
 
+;; pipeline layout and vk-descriptor-sets
+
+(define-ftype vk-descriptor-set-layout uptr)
+
+(define-enum-ftype vk-descriptor-type
+  vk-descriptor-type-sampler
+  vk-descriptor-type-combined-image-sampler
+  vk-descriptor-type-sampled-image
+  vk-descriptor-type-storage-image
+  vk-descriptor-type-uniform-texel-buffer
+  vk-descriptor-type-storage-texel-buffer
+  vk-descriptor-type-uniform-buffer
+  vk-descriptor-type-storage-buffer
+  vk-descriptor-type-uniform-buffer-dynamic
+  vk-descriptor-type-storage-buffer-dynamic
+  vk-descriptor-type-input-attachment
+  (vk-descriptor-type-inline-uniform-block-ext  1000138000)
+  (vk-descriptor-type-acceleration-structure-nv  1000165000))
+
+(define-ftype vk-sampler uptr)
+
+;; todo add more types for Vk-Sampler
+
+(define-foreign-struct vk-descriptor-set-layout-binding
+  ((binding . unsigned-32)
+   (descriptor-type . vk-descriptor-type)
+   (descriptor-count . unsigned-32)
+   (stage-flags . flags)
+   (immutable-samplers . (* vk-sampler))))
+
+(define-vulkan-struct vk-descriptor-set-layout-create-info
+  ((flags . flags)
+   (binding-count . unsigned-32)
+   (bindings . (* vk-descriptor-set-layout-binding))))
+
+(define-vulkan-command vkCreateDescriptorSetLayout
+  ((& vk-device) (* vk-descriptor-set-layout-create-info) uptr (* vk-descriptor-set-layout)))
+
+(define-foreign-struct vk-push-constant-range
+  ((stage-flags . flags)
+   (offset . unsigned-32)
+   (size . unsigned-32)))
+
+(define-vulkan-struct vk-pipeline-layout-create-info
+  ((flags . flags)
+   (set-layout-count . unsigned-32)
+   (set-layouts . (* vk-descriptor-set-layout))
+   (push-constant-range-count . unsigned-32)
+   (push-constant-ranges . (* vk-push-constant-range))))
+
+(define-ftype vk-pipeline-layout uptr)
+
+(define-vulkan-command vkCreatePipelineLayout
+  ((& vk-device) (* vk-pipeline-layout-create-info) uptr (* vk-pipeline-layout)))
+
 #!eof
 
 --------------------------------------------
