@@ -1,20 +1,6 @@
 ;; depends on shaderc library
 ;; defined in shaderc.scm at the root
 
-(define map-indexed
-  (lambda (f arr)
-    (let lp ((i 0)
-	     (xs arr)
-	     (coll '()))
-      (cond
-       ((null? xs) (reverse coll))
-       (else (lp (+ i 1)
-		 (cdr xs)
-		 (cons (f (car xs) i) coll)))))))
-
-;; (map-indexed (lambda (e i) (+ e i)) '(12 34 5))
-
-
 
 (define create-shader-stages
   (lambda (device vertex-shader-filename fragment-shader-filename)
@@ -171,6 +157,39 @@
 						    0.0
 						    0.0
 						    1.0))
+
+;; multisampling
+
+(define (create-multisampling-info)
+  (make-vk-pipeline-multisample-state-create-info pipeline-multisample-state-create-info 0 0
+						  vk-sample-count-1-bit
+						  vk-false
+						  0.0
+						  (make-ftype-pointer unsigned-32 0)
+						  0
+						  0))
+
+;; color blending
+
+(define (create-color-blending-info)
+  (let* ((color-write-mask (bitwise-ior vk-color-component-r-bit
+					vk-color-component-g-bit
+					vk-color-component-b-bit
+					vk-color-component-a-bit))
+	 (color-attachment (make-vk-pipeline-color-blend-attachment-state vk-false
+									  0
+									  0
+									  0
+									  0
+									  0
+									  0
+									  color-write-mask)))
+    (make-vk-pipeline-color-blend-state-create-info pipeline-color-blend-state-create-info 0 0
+						    vk-false
+						    vk-logic-op-copy
+						    1
+						    color-attachment
+						    '(0.0 0.0 0.0 0.0))))
 
 #!eof
 

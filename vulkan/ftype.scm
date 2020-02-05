@@ -590,6 +590,57 @@
    (depth-bias-slope-factor . float)
    (line-width . float)))
 
+;; multisampling
+
+(define-enum-ftype vk-sample-count-flag-bits
+  (vk-sample-count-1-bit  #x00000001)
+  (vk-sample-count-2-bit  #x00000002)
+  (vk-sample-count-4-bit  #x00000004)
+  (vk-sample-count-8-bit  #x00000008)
+  (vk-sample-count-16-bit  #x00000010)
+  (vk-sample-count-32-bit  #x00000020)
+  (vk-sample-count-64-bit  #x00000040))
+
+(define-vulkan-struct vk-pipeline-multisample-state-create-info
+  ((flags . flags)
+   (rasterization-samples . vk-sample-count-flag-bits)
+   (sample-shading-enable . unsigned-32)
+   (min-sample-shading . float)
+   (sample-mask . (* unsigned-32))
+   (alpha-to-coverage-enable . unsigned-32)
+   (alpha-to-one-enable . unsigned-32)))
+
+;; color blending
+
+;; vk-blend-factor, vk-logic-op & vk-blend-op defined in enums.scm
+
+(define-enum-ftype vk-color-component-flag-bits
+  (vk-color-component-r-bit #x00000001)
+  (vk-color-component-g-bit #x00000002)
+  (vk-color-component-b-bit #x00000004)
+  (vk-color-component-a-bit #x00000008))
+
+
+(define-foreign-struct vk-pipeline-color-blend-attachment-state
+  ((enable-blend . unsigned-32)
+   (src-color-blend-factor . vk-blend-factor)
+   (dest-color-blend-factor . vk-blend-factor)
+   (color-blend-op . vk-blend-op)
+   (src-alpha-blend-factor . vk-blend-factor)
+   (dst-alpha-blend-factor . vk-blend-factor)
+   (alpha-blend-op . vk-blend-op)
+   (color-write-mask . flags)))
+
+
+(define-vulkan-struct vk-pipeline-color-blend-state-create-info
+  ((flags . flags)
+   (enable-logic-op . unsigned-32)
+   (logic-op . vk-logic-op)
+   (attachment-count . unsigned-32)
+   (attachments . (* vk-pipeline-color-blend-attachment-state))
+   (blend-constants . (array 4 float))))
+
+
 #!eof
 
 --------------------------------------------
