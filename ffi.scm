@@ -11,6 +11,7 @@
 	  read-int
 	  read-unsigned-32
 
+	  memcpy
 	  malloc
 	  make-foreign-object
 	  make-foreign-array
@@ -34,6 +35,8 @@
 
   (define libc (load-shared-object "libc.so.6"))
 
+  (define memcpy
+    (foreign-procedure "memcpy" (uptr uptr size_t) void))
   
   (define-condition-type &ffi-condition &condition
     ffi-condition ffi-condition?
@@ -109,8 +112,8 @@
     (lambda (strs)
       (let ((ptr (unbox (malloc (* (ftype-sizeof char)
   				   (apply +
-					  (map (lambda (s) (+ 1 (string-length s)))
-					       strs)))))))
+				     (map (lambda (s) (+ 1 (string-length s)))
+					  strs)))))))
   	(let loop ((i 0)
   		   (s strs))
 	  (write "loop daa:")
@@ -186,8 +189,8 @@
 		((ftype-pointer? struct-name obj)
 		 (let ((value (f struct-name member-spec obj)))
 		   (if (ftype-pointer? char value)
-		       (ptr->string value)
-		       value)))
+		     (ptr->string value)
+		     value)))
 		(else (raise (ffi-condition "invalid pointer" obj lambda-name)))))))))
 
 
@@ -272,14 +275,14 @@
 						 (array-pointer-raw-ptr arr-ptr)
 						 i)))
 			      (if (f e)
-				  e
-				  (lp (fx+ 1 i)))))))))
+				e
+				(lp (fx+ 1 i)))))))))
 
 	       (define car-lambda
 		 (lambda (arr-ptr)
 		   (if (> 1 (array-pointer-length arr-ptr))
-		       #f
-		       (array-pointer-raw-ptr arr-ptr))))
+		     #f
+		     (array-pointer-raw-ptr arr-ptr))))
 
 	       (define for-each-lambda
 		 (lambda (f arr-ptr)
@@ -296,26 +299,20 @@
 	       (define list->array-pointer-lambda
 		 (lambda (xs)
 		   (let* ((size (length xs))
-			  (arr (make-ftype-pointer uptr
-						   (unbox (malloc (* (ftype-sizeof uptr)
-								     size))))))
+			  (arr (make-foreign-array pointer-type size)))
 		     (let lp ((i 0)
 			      (xs xs))
 		       (cond
 			((or (null? xs) (= i size))
-			 (make-array-pointer size
-					     (make-ftype-pointer pointer-type
-								 (ftype-pointer-address arr))
-					     
-					     (quote pointer-type)))
+			 (make-array-pointer size arr (quote pointer-type)))
 
-			(else (begin (ftype-set! uptr
-						 ()
-						 arr
-						 i
-						 (ftype-pointer-address (car xs)))
-				     (lp (fx+ 1 i)
-					 (cdr xs)))))))))))])))
+			(else (begin
+				(memcpy (+ (ftype-pointer-address arr)
+					   (* i (ftype-sizeof pointer-type)))
+					(ftype-pointer-address (car xs))		  
+					(ftype-sizeof pointer-type))
+				(lp (fx+ 1 i)
+				    (cdr xs)))))))))))])))
   
 
 
@@ -363,7 +360,7 @@
 		       (member-info
 			(map (lambda (member-spec)
 			       (with-syntax* ((field-name (datum->syntax #'name
-									 (car member-spec)))
+							    (car member-spec)))
 					      (field-getter (construct-name #'name
 									    #'type
 									    "-"
@@ -451,8 +448,8 @@
 			 (with-syntax* (((getters ...)
 					 (map (lambda (member-spec)
 						(with-syntax* ((field-name (datum->syntax
-									    #'name
-									    (car member-spec)))
+									       #'name
+									     (car member-spec)))
 							       (suffix
 								(construct-name #'struct-name
 										#'name
@@ -472,10 +469,10 @@
 			   #'(define lambda-name
 			       (lambda (ptr)
 				 (if (ftype-pointer? struct-name ptr)
-				     (map (lambda (i)
-					    (ftype-ref struct-name (name i) ptr))
-					  (iota size))
-				     (raise (ffi-condition "invalid pointer" ptr lambda-name)))))))
+				   (map (lambda (i)
+					  (ftype-ref struct-name (name i) ptr))
+					(iota size))
+				   (raise (ffi-condition "invalid pointer" ptr lambda-name)))))))
 
 			;; scalar / pointer getters
 			(else (construct-ptr-lambdas #'name (list #'name)))))))
@@ -493,7 +490,7 @@
 	   (let ((member-details (filter identity
 					 (map (lambda (type)
 						(let ((members (and (identifier? type)
-								  (lookup type #'struct-info))))
+								    (lookup type #'struct-info))))
 						  (cond
 						   (members
 						    (cons (syntax->datum type) members))
@@ -521,15 +518,15 @@
     (define (enum e*)
       (let f ([e* e*] [n 0])
 	(if (null? e*)
-	    '()
-	    (syntax-case (car e*) ()
-	      [(e v)
-	       (cons #'(e v)
-		     (f (cdr e*)
-			(+ (syntax->datum #'v) 1)))]
-	      [e (identifier? #'e)
-		 (cons #`(e #,n)
-		       (f (cdr e*) (+ n 1)))]))))
+	  '()
+	  (syntax-case (car e*) ()
+	    [(e v)
+	     (cons #'(e v)
+		   (f (cdr e*)
+		      (+ (syntax->datum #'v) 1)))]
+	    [e (identifier? #'e)
+	       (cons #`(e #,n)
+		     (f (cdr e*) (+ n 1)))]))))
     (syntax-case x ()
       [(_ name e* ...)
        (with-syntax ([((e v) ...) (enum #'(e* ...))])
@@ -594,4 +591,5 @@
 
 (foreign-address-name (cdr exts))
 (equal? a (ptr->string (string->ptr a)))
+
 |#

@@ -22,7 +22,11 @@
 				    (replace-text-in-buffer "_" "-")
 				    (replace-text-in-buffer "=" "")
 				    (replace-text-in-buffer "," ")")
+				    (replace-text-in-buffer "0x" "#x")
 				    (replace-text-in-buffer "vk-" "(vk-"))))
+
+
+(global-set-key (kbd "C-c e") 'convert-c-enum-format-to-scheme)
 
 (provide 'helpers)
 ;;; helpers.el ends here

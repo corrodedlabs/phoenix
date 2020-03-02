@@ -486,6 +486,8 @@
    ;; todo add specialization info when needed
    (specialization-info . uptr)))
 
+(define-collection-lambdas vk-pipeline-shader-stage-create-info)
+
 ;; vertex input
 
 (define-enum-ftype vk-vertex-input-rate
@@ -533,6 +535,12 @@
   ((flags . flags)
    (topology . vk-primitive-topology)
    (primitive-restart-enabled . unsigned-32)))
+
+;; tessellation
+
+(define-vulkan-struct vk-pipeline-tessellation-state-create-info
+  ((flags . flags)
+   (patch-control-points . unsigned-32)))
 
 ;; viewports
 
@@ -610,6 +618,28 @@
    (alpha-to-coverage-enable . unsigned-32)
    (alpha-to-one-enable . unsigned-32)))
 
+;; depth stencil
+
+(define-foreign-struct vk-stencil-op-state
+  ((fail-op . vk-stencil-op)
+   (pass-op . vk-stencil-op)
+   (depth-fail-op . vk-stencil-op)
+   (compare-op . vk-compare-op)
+   (write-mask . unsigned-32)
+   (reference . unsigned-32)))
+
+(define-vulkan-struct vk-pipeline-depth-stencil-state-create-info
+  ((flags . flags)
+   (depth-test-enable . vk-bool32)
+   (depth-write-enable . vk-bool32)
+   (depth-compare-op . vk-compare-op)
+   (depth-bounds-test-enable . vk-bool32)
+   (stencil-test-enable . vk-bool32)
+   (front . vk-stencil-op-state)
+   (back . vk-stencil-op-state)
+   (min-depth-bounds . float)
+   (max-depth-bounds . float)))
+
 ;; color blending
 
 ;; vk-blend-factor, vk-logic-op & vk-blend-op defined in enums.scm
@@ -684,6 +714,8 @@
    (offset . unsigned-32)
    (size . unsigned-32)))
 
+;; pipeline layout
+
 (define-vulkan-struct vk-pipeline-layout-create-info
   ((flags . flags)
    (set-layout-count . unsigned-32)
@@ -695,6 +727,126 @@
 
 (define-vulkan-command vkCreatePipelineLayout
   ((& vk-device) (* vk-pipeline-layout-create-info) uptr (* vk-pipeline-layout)))
+
+(define-ftype vk-pipeline uptr)
+
+;; dynamic state
+
+(define-enum-ftype vk-dynamic-state
+  (vk-dynamic-state-viewport  0)
+  (vk-dynamic-state-scissor  1)
+  (vk-dynamic-state-line-width  2)
+  (vk-dynamic-state-depth-bias  3)
+  (vk-dynamic-state-blend-constants  4)
+  (vk-dynamic-state-depth-bounds  5)
+  (vk-dynamic-state-stencil-compare-mask  6)
+  (vk-dynamic-state-stencil-write-mask  7)
+  (vk-dynamic-state-stencil-reference  8)
+  (vk-dynamic-state-viewport-w-scaling-nv  1000087000)
+  (vk-dynamic-state-discard-rectangle-ext  1000099000)
+  (vk-dynamic-state-sample-locations-ext  1000143000)
+  (vk-dynamic-state-viewport-shading-rate-palette-nv  1000164004)
+  (vk-dynamic-state-viewport-coarse-sample-order-nv  1000164006)
+  (vk-dynamic-state-exclusive-scissor-nv  1000205001)
+  (vk-dynamic-state-line-stipple-ext  1000259000))
+
+(define-vulkan-struct vk-pipeline-dynamic-state-create-info
+  ((flags . flags)
+   (dynamic-state-count . unsigned-32)
+   (dynamic-states . (* vk-dynamic-state))))
+
+;; render pass
+
+(define-ftype vk-render-pass uptr)
+
+(define-enum-ftype vk-attachment-load-op
+  vk-attachment-load-op-load
+  vk-attachment-load-op-clear
+  vk-attachment-load-dont-care)
+
+(define-enum-ftype vk-attachment-store-op
+  vk-attachment-store-op-store
+  vk-attachment-store-dont-care)
+
+(define-foreign-struct vk-attachment-description
+  ((flags . flags)
+   (format . vk-format)
+   (samples . vk-sample-count-flag-bits)
+   (load-op . vk-attachment-load-op)
+   (store-op . vk-attachment-store-op)
+   (stencil-load-op . vk-attachment-load-op)
+   (stencil-store-op . vk-attachment-store-op)
+   (initial-layout . vk-image-layout)
+   (final-layout . vk-image-layout)))
+
+(define-foreign-struct vk-attachment-reference
+  ((attachment . unsigned-32)
+   (layout . vk-image-layout)))
+
+(define-enum-ftype vk-pipeline-bind-point
+  vk-pipeline-bind-point-graphics
+  vk-pipeline-bind-point-compute
+  (vk-pipeline-bind-point-ray-tracing-nv 1000165000))
+
+(define-foreign-struct vk-subpass-description
+  ((flags . flags)
+   (pipeline-bind-point . vk-pipeline-bind-point)
+   (input-attachment-count . unsigned-32)
+   (input-attachments . (* vk-attachment-reference))
+   (color-attachment-count . unsigned-32)
+   (color-attachments . (* vk-attachment-reference))
+   (resolve-attachments . (* vk-attachment-reference))
+   (depth-stencil-attachments . (* vk-attachment-reference))
+   (preserve-attachment-count . unsigned-32)
+   (preserve-attachments . (* unsigned-32))))
+
+(define-foreign-struct vk-subpass-dependency
+  ((src-subpass . unsigned-32)
+   (dest-subpass . unsigned-32)
+   (src-stage-mask . flags)
+   (dst-stage-mask . flags)
+   (src-access-mask . flags)
+   (dst-access-mask . flags)
+   (dependency-flags . flags)))
+
+(define-vulkan-struct vk-render-pass-create-info
+  ((flags . flags)
+   (attachment-count . unsigned-32)
+   (attachments . (* vk-attachment-description))
+   (subpass-count . unsigned-32)
+   (subpasses . (* vk-subpass-description))
+   (dependency-count . unsigned-32)
+   (dependencies . (* vk-subpass-dependency))))
+
+(define-vulkan-command vkCreateRenderPass
+  ((& vk-device) (* vk-render-pass-create-info) uptr (* vk-render-pass)))
+
+;; pipeline
+
+(define-vulkan-struct vk-graphics-pipeline-create-info
+  ((flags . flags)
+   (stage-count . unsigned-32)
+   (stages . (* vk-pipeline-shader-stage-create-info))
+   (vertex-input-state . (* vk-pipeline-vertex-input-state-create-info))
+   (input-assembly-state . (* vk-pipeline-input-assembly-state-create-info))
+   (tessellation-stage . (* vk-pipeline-tessellation-state-create-info))
+   (viewport-state . (* vk-pipeline-viewport-state-create-info))
+   (rasterization-state . (* vk-pipeline-rasterization-state-create-info))
+   (multisample-state . (* vk-pipeline-multisample-state-create-info))
+   (depth-stencil-state . (* vk-pipeline-depth-stencil-state-create-info))
+   (color-blend-state . (* vk-pipeline-color-blend-state-create-info))
+   (dynamic-state . (* vk-pipeline-dynamic-state-create-info))
+   (layout . vk-pipeline-layout)
+   (render-pass . vk-render-pass)
+   (subpass . unsigned-32)
+   (base-pipeline-handle . vk-pipeline)
+   (base-pipeline-index . int)))
+
+(define-ftype vk-pipeline-cache uptr)
+
+(define-vulkan-command vkCreateGraphicsPipelines
+  ((& vk-device) uptr unsigned-32 (* vk-graphics-pipeline-create-info) uptr (* vk-pipeline)))
+
 
 #!eof
 

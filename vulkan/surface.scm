@@ -14,7 +14,7 @@
 ;; creates a new window and returns a window-details record wrapping surface and window
 (define setup-window
   (lambda (instance width height)
-    (let ((window (create-window width height)))
+    (let ((window (new-window width height)))
       (make-window-details window (create-surface instance window)))))
 
 

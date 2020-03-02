@@ -8,8 +8,10 @@
     (define create-shader-module
       (lambda (spv-array-pointer)
 	(let ((info (make-vk-shader-module-create-info shader-module-create-info 0 0
-						       (array-pointer-length spv-array-pointer)
-						       (array-pointer-raw-ptr spv-array-pointer)))
+						       (array-pointer-length
+							spv-array-pointer)
+						       (array-pointer-raw-ptr
+							spv-array-pointer)))
 	      (module (make-foreign-object vk-shader-module)))
 	  (vk-create-shader-module device info 0 module)
 	  module)))
@@ -33,6 +35,7 @@
 ;; vertex input 
 
 (define-record-type vertex-input (fields position color))
+
 
 (define vertex-input-total-length
   (lambda (input)
@@ -70,8 +73,8 @@
 (define vector->attr
   (lambda (v)
     (case (vector-length v)
-      ((2) (cons 8 vk-format-r32g32-sfloat))
-      ((3) (cons 12 vk-format-r32g32b32-sfloat))
+      ((2) (cons vk-format-r32g32-sfloat 8))
+      ((3) (cons vk-format-r32g32b32-sfloat 12))
       (else (error "unsupported vector" v)))))
 
 (define vertex-input->attrs
@@ -116,9 +119,10 @@
 
 (define create-pipeline-assembly-state
   (lambda ()
-    (make-vk-pipeline-input-assembly-state-create-info pipeline-input-assembly-state-create-info 0 0
-						       vk-primitive-topology-triangle-list
-						       vk-false)))
+    (make-vk-pipeline-input-assembly-state-create-info
+     pipeline-input-assembly-state-create-info 0 0
+     vk-primitive-topology-triangle-list
+     vk-false)))
 
 ;; viewport
 
@@ -203,29 +207,160 @@
     (vk-create-pipeline-layout device layout-info 0 layout)
     layout))
 
+;; let's capture all the custom information that can be supplied in the pipeline in a record
+
+;; currently supported shaders
+(define-record-type shaders (fields vertex fragment))
+(define-record-type vertex-input-details (fields vertex-input-list stride attrs))
+(define-record-type pipeline-data (fields shaders vertex-input-details))
+
+;; render pass
+
+(define create-render-pass
+  (lambda (device swapchain-details)
+
+    ;; defined as (~0U)
+    (define vk-subpass-external 0)
+    
+    (define create-render-pass-info
+      (lambda ()
+	(let* ((swapchain-image-format
+		(vk-surface-format-khr-format (swapchain-details-surface-format
+					       swapchain-details)))
+	       
+	       (color-attachment
+		(make-vk-attachment-description 0
+						swapchain-image-format
+						vk-sample-count-1-bit
+						vk-attachment-load-op-clear
+						vk-attachment-store-op-store
+						vk-attachment-load-dont-care
+						vk-attachment-store-dont-care
+						vk-image-layout-undefined
+						vk-image-layout-present-src-khr))
+	       
+	       (color-attachment-ref
+		(make-vk-attachment-reference 0
+					      vk-image-layout-color-attachment-optimal))
+	       
+	       (subpass
+		(make-vk-subpass-description 0
+					     vk-pipeline-bind-point-graphics
+					     0
+					     (null-pointer vk-attachment-reference)
+					     1
+					     color-attachment-ref
+					     (null-pointer vk-attachment-reference)
+					     (null-pointer vk-attachment-reference)
+					     0
+					     (null-pointer unsigned-32)))
+	       
+	       (dependency
+		(make-vk-subpass-dependency vk-subpass-external
+					    0
+					    vk-pipeline-stage-color-attachment-output-bit
+					    vk-pipeline-stage-color-attachment-output-bit
+					    0
+					    (bitwise-ior
+					     vk-access-color-attachment-read-bit
+					     vk-access-color-attachment-write-bit)
+					    0)))
+	  
+	  (make-vk-render-pass-create-info render-pass-create-info 0 0
+					   1
+					   color-attachment
+					   1
+					   subpass
+					   1
+					   dependency))))
+
+    (let ((info (create-render-pass-info))
+	  (render-pass (make-foreign-object vk-render-pass)))
+      (vk-create-render-pass device info 0 render-pass)
+      render-pass)))
 
 
-#!eof
+(define create-graphics-pipeline
+  (lambda (device swapchain-details pipeline-data)
+    (let* ((shaders (pipeline-data-shaders pipeline-data))
+	   (shader-stages (list->vk-pipeline-shader-stage-create-info-pointer-array
+			   (create-shader-stages device
+						 (shaders-vertex shaders)
+						 (shaders-fragment shaders))))
+	   (vertex-input-data (pipeline-data-vertex-input-details pipeline-data))
+	   (render-pass (create-render-pass device swapchain-details))
+	   (pipeline-info
+	    (make-vk-graphics-pipeline-create-info
+	     graphics-pipeline-create-info 0 0
+	     (array-pointer-length shader-stages)
+	     (vk-pipeline-shader-stage-create-info-pointer-car
+	      shader-stages)
+	     (create-vertex-input
+	      (vertex-input-details-stride vertex-input-data)
+	      (vertex-input-details-attrs vertex-input-data))
+	     (create-pipeline-assembly-state)
+	     (null-pointer
+	      vk-pipeline-tessellation-state-create-info)
+	     (create-viewport-info
+	      (swapchain-details-extent swapchain-details))
+	     (create-rasterizer-info)
+	     (create-multisampling-info)
+	     (null-pointer
+	      vk-pipeline-depth-stencil-state-create-info)
+	     (create-color-blending-info)
+	     (null-pointer vk-pipeline-dynamic-state-create-info)
+	     (pointer-ref-value (create-pipeline-layout device))
+	     (pointer-ref-value render-pass)
+	     0
+	     0
+	     0))
+	   (pipeline (make-foreign-object vk-pipeline)))
+      (vk-create-graphics-pipelines device
+				    0
+				    1
+				    pipeline-info
+				    0
+				    pipeline)
+      pipeline)))
 
-(load "vulkan/pipeline.scm")
-(create-shader-stages (vulkan-state-device vs)
-		      "shaders/shader.vert"
-		      "shaders/shader.frag")
+;; samplte usage
 
-
-(make-bytevector (*  4))
-(bytevector-ieee-double-set!)
-
+(define device (vulkan-state-device vs))
+(define swapchain-details (vulkan-state-swapchain vs))
 
 (define vertices (list (make-vertex-input '#2( 0.0 -0.5) '#3(1.0 0.0 0.0))
 		       (make-vertex-input '#2( 0.5  0.5) '#3(0.0 1.0 0.0))
 		       (make-vertex-input '#2(-0.5  0.5) '#3(0.0 0.0 1.0))))
 
+(define stride 4)
+
+(define shaders (make-shaders "shaders/shader.vert" "shaders/shader.frag"))
+
+(define pipeline-data
+  (make-pipeline-data shaders
+		      (make-vertex-input-details vertices
+						 stride
+						 (vertex-input->attrs (car vertices)))))
+
+
+#!eof
+
+(load "vulkan/pipeline.scm")
+(define ss (create-shader-stages (vulkan-state-device vs)
+				 (shaders-vertex shaders)
+				 (shaders-fragment shaders)))
+
+(ftype-pointer->sexpr (car ss))
+
+(list->vk-pipeline-shader-stage-create-info-pointer-array ss)
+(make-bytevector (*  4))
+(bytevector-ieee-double-set!)
+
+
+
 (define vertices-length (fold-left + 0 (map vertex-input-total-length vertices)))
 
 (vertices->bytevector vertices)
-
-(define stride 4)
 
 (define attrs (vertex-input->attrs (car vertices)))
 
@@ -236,3 +371,42 @@
 (create-viewport-info swapchain-extent)
 
 (create-pipeline-layout (vulkan-state-device vs))
+
+
+(create-graphics-pipeline device swapchain-details pipeline-data)
+
+(define-ftype shader-stage-array (array 2 vk-pipeline-shader-stage-create-info))
+
+(define s (make-foreign-object shader-stage-array))
+(let ()
+  (ftype-set! shader-stage-array () s 0 (ftype-pointer-address (car ss)))
+  (ftype-set! vk-pipeline-shader-stage-create-info () s 1 (cadr ss))
+  s)
+
+;; fix the list conversion
+
+(define list->vk-pipeline-shader-stage-create-info-pointer-array
+  (lambda (xs)
+    (let* ([size (length xs)] [arr (make-foreign-array vk-pipeline-shader-stage-create-info
+						       size)])
+      (let lp ([i 0] [xs xs])
+	(cond
+	 [(or (null? xs) (= i size))
+	  (make-array-pointer size
+			      arr
+			      'vk-pipeline-shader-stage-create-info)]
+	 [else
+	  (begin
+	    (memcpy (+ (ftype-pointer-address arr)
+		       (* i (ftype-sizeof vk-pipeline-shader-stage-create-info)))
+		    (ftype-pointer-address (car xs))		    
+		    (ftype-sizeof vk-pipeline-shader-stage-create-info))
+	    (lp (fx+ 1 i) (cdr xs)))])))))
+
+
+(list->vk-pipeline-shader-stage-create-info-pointer-array ss)
+
+(vk-pipeline-shader-stage-create-info-pointer-map
+ ftype-pointer->sexpr
+ (list->vk-pipeline-shader-stage-create-info-pointer-array ss))
+(load "vk.scm")

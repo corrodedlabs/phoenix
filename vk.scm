@@ -50,6 +50,7 @@
 
 #!eof
 
+> (load "vk.scm")
 
 > (load "ffi.scm")
 > (import (ffi))
