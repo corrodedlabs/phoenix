@@ -9,6 +9,7 @@
 	(member-name . member-type) ...]))))
 
 (define-ftype uint32-t unsigned-32)
+(define-ftype u32 unsigned-32)
 (define-ftype flags uint32-t)
 
 (define-ftype vk-bool32 unsigned-32)
@@ -846,6 +847,189 @@
 
 (define-vulkan-command vkCreateGraphicsPipelines
   ((& vk-device) uptr unsigned-32 (* vk-graphics-pipeline-create-info) uptr (* vk-pipeline)))
+
+;; buffers
+
+(define-ftype vk-buffer uptr)
+
+(define-ftype vk-device-size unsigned-64)
+
+(define-vulkan-struct vk-buffer-create-info
+  ((flags . flags)
+   (size . vk-device-size)
+   (usage . flags)
+   (sharing-mode . vk-sharing-mode)
+   (queue-family-index-count . unsigned-32)
+   (queue-family-indices . (* unsigned-32))))
+
+(define-vulkan-command vkCreateBuffer
+  ((& vk-device) (* vk-buffer-create-info) uptr (* vk-buffer)))
+
+;; memory
+
+(define +vk-max-memory-type+ 32)
+(define +vk-max-memory-heaps+ 16)
+
+(define-foreign-struct vk-memory-type
+  ((property-flags . flags)
+   (heap-index . u32)))
+
+(define-foreign-struct vk-memory-heap
+  ((size . vk-device-size)
+   (memory-heap-flags . flags)))
+
+(define-ftype vk-physical-device-memory-properties
+  (struct (memory-type-count u32)
+	  (memory-types (array 32 vk-memory-type))
+	  (memory-heap-count u32)
+	  (memory-heaps (array 16 vk-memory-heap))))
+
+(define vk-get-physical-device-memory-properties
+  (foreign-procedure "vkGetPhysicalDeviceMemoryProperties"
+		     ((& vk-physical-device) (* vk-physical-device-memory-properties))
+		     void))
+
+(define-vulkan-struct vk-memory-requirements
+  ((size . vk-device-size)
+   (alignment . vk-device-size)
+   (memory-type-bits . unsigned-32)))
+
+(define vk-get-buffer-memory-requirements
+  (foreign-procedure "vkGetBufferMemoryRequirements"
+		     ((& vk-device) (& vk-buffer) (* vk-memory-requirements)) void))
+
+;; allocate gpu memory
+
+(define-ftype vk-device-memory uptr)
+
+(define-vulkan-struct vk-memory-allocate-info
+  ((allocation-size . vk-device-size)
+   (memory-type-index . unsigned-32)))
+
+(define-vulkan-command vkAllocateMemory
+  ((& vk-device) (* vk-memory-allocate-info) uptr (* vk-device-memory)))
+
+(define-vulkan-command vkBindBufferMemory
+  ((& vk-device) (& vk-buffer) (& vk-device-memory) vk-device-size))
+
+(define-vulkan-command vkMapMemory
+  ((& vk-device) (& vk-device-memory) vk-device-size vk-device-size flags uptr))
+
+(define-vulkan-command vkUnmapMemory ((& vk-device) (& vk-device-memory)))
+
+;; framebuffers
+(define-ftype vk-frame-buffer uptr)
+
+(define-vulkan-struct vk-frame-buffer-create-info
+  ((flags . flags)
+   (render-pass . vk-render-pass)
+   (attachment-count . unsigned-32)
+   (attachments . (* vk-image-view))
+   (width . unsigned-32)
+   (height . unsigned-32)
+   (layers . unsigned-32)))
+
+(define-vulkan-command vkCreateFramebuffer
+  ((& vk-device) (* vk-frame-buffer-create-info) uptr (* vk-frame-buffer)))
+
+;; command pool
+(define-ftype vk-command-pool uptr)
+
+(define-vulkan-struct vk-command-pool-create-info
+  ((flags . flags)
+   (queue-family-index . unsigned-32)))
+
+(define-vulkan-command vkCreateCommandPool
+  ((& vk-device) (* vk-command-pool-create-info) uptr (* vk-command-pool)))
+
+(define-vulkan-command vkDestroyCommandPool ((& vk-device) (& vk-command-pool) uptr))
+
+(define-vulkan-command vkResetCommandPool ((& vk-device) (& vk-command-pool) flags))
+
+;; Descriptor sets
+
+
+
+;; Command buffers
+(define-ftype vk-command-buffer uptr)
+
+(define-enum-ftype vk-command-buffer-level
+  vk-command-buffer-level-primary
+  vk-command-buffer-level-secondary)
+
+(define-vulkan-struct vk-command-buffer-allocate-info
+  ((command-pool . vk-command-pool)
+   (level . vk-command-buffer-level)
+   (command-buffer-count . unsigned-32)
+   (queue-index . unsigned-32)))
+
+(define-vulkan-command vkAllocateCommandBuffers
+  ((& vk-device) (* vk-command-buffer-allocate-info) (* vk-command-buffer)))
+
+(define-vulkan-command vkFreeCommandBuffers
+  ((& vk-device) (& vk-command-pool) unsigned-32 (* vk-command-buffer)))
+
+(define-vulkan-struct vk-command-buffer-inheritance-info
+  ((render-pass . vk-render-pass)
+   (subpass . unsigned-32)
+   (framebuffer . vk-frame-buffer)
+   (occlusion-query-enable . vk-bool32)
+   (query-flags . flags)
+   (pipeline-statistic-flags . flags)))
+
+(define-vulkan-struct vk-command-buffer-begin-info
+  ((flags . flags)
+   (inheritance-info . (* vk-command-buffer-inheritance-info))))
+
+(define-vulkan-command vkBeginCommandBuffer
+  ((& vk-command-buffer) (* vk-command-buffer-begin-info)))
+(define-vulkan-command vkEndCommandBuffer ((& vk-command-buffer)))
+(define-vulkan-command vkResetCommandBuffer ((& vk-command-buffer) flags))
+
+(define-enum-ftype vk-index-type
+  vk-index-type-uint16
+  vk-index-type-uint32
+  (vk-index-type-none-nv 1000165000)
+  (vk-index-type-uint8-ext 1000265000))
+
+;; macro to help define render pass commands
+(define-syntax define-render-pass-command
+  (lambda (stx)
+    (syntax-case stx ()
+      ((_ scheme-cmd) #'(define-render-pass-command scheme-cmd ()))
+      ((_ scheme-cmd (args ...))
+       (with-syntax ((c-command (datum->syntax #'scheme-cmd
+				  (kebab-case->camel-case
+				   (symbol->string (syntax->datum #'scheme-cmd))))))
+	 #'(define scheme-cmd
+	     (foreign-procedure c-command
+				((& vk-command-buffer) args ...)
+				void)))))))
+
+;; render pass commands
+
+(define-render-pass-command vk-cmd-bind-pipeline (vk-pipeline-bind-point (& vk-pipeline)))
+
+(define-render-pass-command vk-cmd-bind-vertex-buffers
+  (unsigned-32 unsigned-32 (* vk-buffer) (* vk-device-size)))
+
+(define-render-pass-command vk-cmd-bind-index-buffer
+  (vk-buffer vk-device-size vk-index-type))
+
+;; (define-render-pass-command vk-cmd-bind-descriptor-sets
+;;   (vk-pipeline-bind-point vk-pipeline-layout unsigned-32 unsigned-32
+;; 			  (* vk-descriptor-set) unsigned-32 (* unsigned-32)))
+
+(define-render-pass-command vk-cmd-draw-indexed
+  (unsigned-32 unsigned-32 unsigned-32 int unsigned-32))
+
+(define-render-pass-command vk-cmd-end-render-pass)
+
+
+
+
+
+
 
 
 #!eof

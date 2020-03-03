@@ -47,6 +47,8 @@
       (make-vulkan-state window surface physical-device queue-index device queues
 			 swapchain-details))))
 
+(define vs (setup-vulkan))
+
 
 #!eof
 

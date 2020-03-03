@@ -3,8 +3,7 @@
   (fields surface-format
 	  present-mode
 	  extent
-	  capabilities
-	  (mutable swapchain)))
+	  capabilities))
 
 (define choose-swapchain-settings
   (lambda (surface-formats present-modes surface-capabilities)
@@ -40,8 +39,7 @@
     (make-swapchain-details (choose-surface-format)
 			    (choose-present-modes)
 			    (choose-swapchain-extent)
-			    surface-capabilities
-			    #f)))
+			    surface-capabilities)))
 
 (define query-swapchain-details
   (lambda (physical-device surface)
@@ -80,7 +78,9 @@
       (and (swapchain-compatible? surface-formats present-modes)
 	 (choose-swapchain-settings surface-formats present-modes capabilities)))))
 
-(define create-swapchain
+;; creates  the swapchain handle
+;; returns a cons cell (swapchain-handle . swapchain-details)
+(define create-swapchain-handle
   (lambda (physical-device device surface queue-index)
 
     (define create-swapchain-info
@@ -115,9 +115,11 @@
 
     (let ((swapchain (make-foreign-object vk-swapchain))
 	  (swapchain-details (query-swapchain-details physical-device surface)))
-      (vk-create-swapchain-khr device (create-swapchain-info swapchain-details) 0 swapchain)
-      (swapchain-details-swapchain-set! swapchain-details swapchain)
-      swapchain-details)))
+      (vk-create-swapchain-khr device
+			       (create-swapchain-info swapchain-details)
+			       0
+			       swapchain)
+      (cons swapchain swapchain-details))))
 
 (define create-swapchain-images
   (lambda (device swapchain)
@@ -137,11 +139,12 @@
 						     vk-component-swizzle-identity
 						     vk-component-swizzle-identity))
 	      (surface-format (swapchain-details-surface-format swapchain-details))
-	      (subresource-range (make-vk-image-subresource-range vk-image-aspect-color-bit
-								  0
-								  1
-								  0
-								  1)))
+	      (subresource-range (make-vk-image-subresource-range
+				  vk-image-aspect-color-bit
+				  0
+				  1
+				  0
+				  1)))
 	  (make-vk-image-view-create-info image-view-create-info 0 0
 					  (pointer-ref-value image)
 					  vk-image-view-type-2d
@@ -149,7 +152,36 @@
 					  components
 					  subresource-range))))
 
-    (vk-image-pointer-map create-swapchain-image-view-info images)))
+    (vk-image-pointer-map (lambda (image)
+			    (let ((info (create-swapchain-image-view-info image))
+				  (image-view (make-foreign-object vk-image-view)))
+			      (vk-create-image-view device info 0 image-view)
+			      image-view))
+			  images)))
+
+;; record to store the information of swapchain and its images and views
+;; this struct will be available in the vulkan state and can be used at any stage to
+;; refer to the contents of swapchain or apply relevant functions
+(define-record-type swapchain
+  (fields handle images image-views format extent))
+
+(define (create-swapchain physical-device device surface queue-index)
+  (let* ((swapchain-info (create-swapchain-handle physical-device
+						  device
+						  surface
+						  queue-index))
+	 (swapchain (car swapchain-info))
+	 (swapchain-details (cdr swapchain-info))
+
+	 (images (create-swapchain-images device swapchain))
+	 (image-views (create-swapchain-image-views device
+						    swapchain-details
+						    images)))
+    (make-swapchain swapchain
+		    images
+		    image-views
+		    (swapchain-details-surface-format swapchain-details)
+		    (swapchain-details-extent swapchain-details))))
 
 #!eof
 
