@@ -63,6 +63,10 @@
 		    vals)
        (* 4 (length vals))))))
 
+
+(define (sizeof-vertex-input-arr arr)
+  (fold-left + 0 (map vertex-input-total-size arr)))
+
 (define vertices->vector
   (lambda (vertices)
     (apply vector-append

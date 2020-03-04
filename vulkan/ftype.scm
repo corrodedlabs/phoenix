@@ -1052,7 +1052,7 @@
    (signal-semaphores . (* vk-semaphore))))
 
 (define-vulkan-command vkQueueSubmit
-  ((& vk-queue) u32 (* vk-submit-info) (& vk-fence)))
+  ((& vk-queue) u32 (* vk-submit-info) uptr))
 
 (define-vulkan-command vkQueueWaitIdle ((& vk-queue)))
 

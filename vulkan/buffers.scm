@@ -52,7 +52,6 @@
 	  (let ((info
 		 (make-vk-command-buffer-allocate-info command-buffer-allocate-info
 						       0
-						       0
 						       (pointer-ref-value command-pool)
 						       vk-command-buffer-level-primary
 						       1
@@ -64,20 +63,23 @@
 			     (null-pointer vk-command-buffer-inheritance-info))))
 	    (vk-allocate-command-buffers device info command-buffer)
 	    (vk-begin-command-buffer command-buffer begin-info)))
-	(lambda () (f command-buffer))
 	(lambda ()
-	  (let ((submit-info (make-vk-submit-info submit-info 0
-						  0
-						  (null-pointer vk-semaphore)
-						  (null-pointer flags)
-						  1
-						  command-buffer
-						  0
-						  (null-pointer vk-semaphore))))
-	    (vk-end-command-buffer command-buffer)
-	    (vk-queue-submit graphics-queue 1 submit-info (null-pointer vk-fence))
-	    (vk-queue-wait-idle graphics-queue)
-	    (vk-free-command-buffers device command-pool 1 command-buffer)))))))
+	  (begin (f command-buffer)
+		 (let ((submit-info (make-vk-submit-info submit-info 0
+							 0
+							 (null-pointer vk-semaphore)
+							 (null-pointer flags)
+							 1
+							 command-buffer
+							 0
+							 (null-pointer vk-semaphore))))
+		   (displayln "end command buffer" command-buffer)
+		   (vk-end-command-buffer command-buffer)
+		   (displayln "queue submit" graphics-queue)
+		   (vk-queue-submit graphics-queue 1 submit-info 0)
+		   (vk-queue-wait-idle graphics-queue))))
+	(lambda ()
+	  (vk-free-command-buffers device command-pool 1 command-buffer))))))
 
 
 ;; Buffers
@@ -133,11 +135,8 @@
        (vk-create-buffer device info 0 buffer)
        buffer))))
 
-
-;; buffer created using HOST_VISIBLE and HOST_COHERENT
-;; can be used as staging buffer
-(define create-host-buffer
-  (lambda (physical-device device data)
+(define allocate-memory
+  (lambda (physical-device device buffer-ptr mode)
 
     (define get-memory-requirements
       (lambda (buffer)
@@ -145,24 +144,52 @@
 	  (vk-get-buffer-memory-requirements device buffer requirements)
 	  requirements)))
 
-    (define allocate-memory
-      (lambda (buffer-ptr)
-	(let* ((memory-requirements (get-memory-requirements buffer-ptr))
+    
+    (let* ((required-properties (case mode
+				  ((host-local)
+				   (bitwise-ior vk-memory-property-host-visible-bit
+						vk-memory-property-host-coherent-bit))
+				  ((gpu-local)
+				   vk-memory-property-device-local-bit)))
+	   
+	   (memory-requirements (get-memory-requirements buffer-ptr))
 
-	       (memory-index
-		(find-memory-type-index physical-device
-					(vk-memory-requirements-memory-type-bits
-					 memory-requirements)
-					(bitwise-ior vk-memory-property-host-visible-bit
-						     vk-memory-property-host-coherent-bit)))
+	   (memory-index
+	    (find-memory-type-index physical-device
+				    (vk-memory-requirements-memory-type-bits
+				     memory-requirements)
+				    required-properties))
 
-	       (alloc-info (make-vk-memory-allocate-info
-			    memory-allocate-info 0
-			    (vk-memory-requirements-size memory-requirements)
-			    memory-index))
-	       (memory (make-foreign-object vk-device-memory)))
-	  (vk-allocate-memory device alloc-info 0 memory)
-	  memory)))
+	   (alloc-info (make-vk-memory-allocate-info
+			memory-allocate-info 0
+			(vk-memory-requirements-size memory-requirements)
+			memory-index))
+	   (memory (make-foreign-object vk-device-memory)))
+      (displayln "Alloc size" (vk-memory-requirements-size memory-requirements))
+      (vk-allocate-memory device alloc-info 0 memory)
+      memory)))
+
+;; copies data b/w two gpu buffers
+(define copy-buffer-data
+  (lambda (device command-pool graphics-queue src-buffer dst-buffer size)
+    (displayln "copying buffer data of size " size)
+    (let ((copy-region (make-vk-buffer-copy 0 0 size)))
+      (execute-command-buffer device
+			      command-pool
+			      graphics-queue
+			      (lambda (command-buffer)
+				(displayln "command-buffer is" command-buffer)
+				(vk-cmd-copy-buffer command-buffer
+						    src-buffer
+						    dst-buffer
+						    1
+						    copy-region))))))
+
+
+;; buffer created using HOST_VISIBLE and HOST_COHERENT
+;; can be used as staging buffer
+(define create-host-buffer
+  (lambda (physical-device device data)
 
     ;; copy data from cpu to gpu host local memory
     (define copy-data
@@ -181,18 +208,30 @@
 		  data-size)
 	  (vk-unmap-memory device memory))))
 
-    (let* ((size (fold-left + 0 (map vertex-input-total-size data)))
+    (let* ((size (sizeof-vertex-input-arr data))
 	   (buffer-ptr (create-new-buffer device size host-local))
-	   (memory (allocate-memory buffer-ptr)))
+	   (memory (allocate-memory physical-device device buffer-ptr host-local)))
       (vk-bind-buffer-memory device buffer-ptr memory 0)
       (copy-data memory size)
       (make-buffer buffer-ptr memory size))))
 
-;; high performance gpu buffer
-;; to get the data here, use a host local staging buffer
+;; create high performance gpu buffer
+;; a staging buffer will be used to copy the data over
+;; different usage may be made available using identifier syntax
 (define create-gpu-local-buffer
-  (lambda (device)
-    ))
+  (lambda (physical-device device graphics-queue data usage)
+    (let* ((staging-buffer (create-host-buffer physical-device device data))
+	   (size (sizeof-vertex-input-arr data))
+	   (gpu-buffer-ptr (create-new-buffer device size gpu-local usage))
+	   (memory (allocate-memory physical-device device gpu-buffer-ptr gpu-local)))
+      (vk-bind-buffer-memory device gpu-buffer-ptr memory 0)
+      (copy-buffer-data device
+      			command-pool
+      			graphics-queue
+      			(buffer-handle staging-buffer)
+      			gpu-buffer-ptr
+      			size)
+      (make-buffer gpu-buffer-ptr memory size))))
 
 
 ;; Sample usage
@@ -207,20 +246,24 @@
 (define physical-device (vulkan-state-physical-device vs))
 (define buf (create-host-buffer physical-device device vertices))
 
+(define graphics-queue (car (vulkan-state-queues vs)))
+(define vertex-buffer (create-gpu-local-buffer physical-device
+					       device
+					       graphics-queue
+					       vertices
+					       vk-buffer-usage-vertex-buffer-bit))
 
 ;; (define memory (buffer-memory buf))
 ;; (define data-size (buffer-size buf))
 
-;; (define graphics-queue (car (vulkan-state-queues vs)))
 
-;; (execute-command-buffer device
-;; 			command-pool
-;; 			graphics-queue
-;; 			(lambda (command-buffer)
-;; 			  (vk-cmd-copy-buffer command-buffer )))
 
 ;; Vertex buffers
 
 ;; (define create-vertex-buffer
 ;;   (lambda (device command-pool graphics-queue)
 ;;     ))
+
+;; (begin (load "vk.scm")
+;;        (load "vulkan/pipeline.scm")
+;;        (load "vulkan/buffers.scm"))
