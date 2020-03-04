@@ -12,6 +12,7 @@
 (define-ftype u32 unsigned-32)
 (define-ftype flags uint32-t)
 
+(define-collection-lambdas u32)
 (define-collection-lambdas float)
 
 (define-ftype vk-bool32 unsigned-32)

@@ -73,13 +73,13 @@
 							 command-buffer
 							 0
 							 (null-pointer vk-semaphore))))
-		   (displayln "end command buffer" command-buffer)
 		   (vk-end-command-buffer command-buffer)
-		   (displayln "queue submit" graphics-queue)
 		   (vk-queue-submit graphics-queue 1 submit-info 0)
 		   (vk-queue-wait-idle graphics-queue))))
 	(lambda ()
-	  (vk-free-command-buffers device command-pool 1 command-buffer))))))
+	  ;; (vk-free-command-buffers device command-pool 1 command-buffer)
+	  #f
+	  )))))
 
 
 ;; Buffers
@@ -132,6 +132,7 @@
 					      0
 					      (null-pointer unsigned-32)))
 	    (buffer (make-foreign-object vk-buffer)))
+       (displayln "creating buffer fir " usage)
        (vk-create-buffer device info 0 buffer)
        buffer))))
 
@@ -186,33 +187,53 @@
 						    copy-region))))))
 
 
+(define data-size
+  (lambda (data)
+    (cond
+     ((vertex-input? (car data)) (sizeof-vertex-input-arr data))
+     ((number? (car data)) (* 4 (length data))))))
+
+;; copy data from cpu to gpu host local memory
+(define copy-data
+  (lambda (device memory data)
+    (let ((data-ptr (make-foreign-object uptr))
+
+	  (size (data-size data)))
+      (vk-map-memory device memory 0 size 0 (ftype-pointer-address data-ptr))
+      (displayln "size if " size)
+      (memcpy (ftype-pointer-address data-ptr)
+	      (ftype-pointer-address
+	       (array-pointer-raw-ptr
+		(cond
+		 ((vertex-input? (car data))
+		  (list->float-pointer-array
+		   (map (lambda (value)
+			  (let ((ptr (make-foreign-object float)))
+			    (ftype-set! float () ptr value)
+			    ptr)) 
+			(vertices->list data))))
+		 ((number? (car data)) (list->u32-pointer-array
+					(map (lambda (value)
+					       (displayln "setting value" value)
+					       (let ((ptr (make-foreign-object u32)))
+						 (ftype-set! u32 () ptr value)
+						 ptr)) 
+					     data))))))
+	      size)
+      (vk-unmap-memory device memory))))
+
+
 ;; buffer created using HOST_VISIBLE and HOST_COHERENT
 ;; can be used as staging buffer
 (define create-host-buffer
   (lambda (physical-device device data)
 
-    ;; copy data from cpu to gpu host local memory
-    (define copy-data
-      (lambda (memory data-size)
-	(let ((data (make-foreign-object uptr)))
-	  (vk-map-memory device memory 0 data-size 0 (ftype-pointer-address data))
-	  (memcpy (ftype-pointer-address data)
-		  (ftype-pointer-address
-		   (array-pointer-raw-ptr
-		    (list->float-pointer-array (map
-						(lambda (value)
-						  (let ((ptr (make-foreign-object float)))
-						    (ftype-set! float () ptr value)
-						    ptr))
-						(vertices->list vertices)))))
-		  data-size)
-	  (vk-unmap-memory device memory))))
-
-    (let* ((size (sizeof-vertex-input-arr data))
+    (let* ((size (data-size data))
 	   (buffer-ptr (create-new-buffer device size host-local))
 	   (memory (allocate-memory physical-device device buffer-ptr host-local)))
       (vk-bind-buffer-memory device buffer-ptr memory 0)
-      (copy-data memory size)
+      (copy-data device memory data)
+      (displayln "ok creating a host local buffer for data" data)
       (make-buffer buffer-ptr memory size))))
 
 ;; create high performance gpu buffer
@@ -221,9 +242,10 @@
 (define create-gpu-local-buffer
   (lambda (physical-device device graphics-queue data usage)
     (let* ((staging-buffer (create-host-buffer physical-device device data))
-	   (size (sizeof-vertex-input-arr data))
+	   (size (data-size data))
 	   (gpu-buffer-ptr (create-new-buffer device size gpu-local usage))
 	   (memory (allocate-memory physical-device device gpu-buffer-ptr gpu-local)))
+      (displayln "fuck thi " size)
       (vk-bind-buffer-memory device gpu-buffer-ptr memory 0)
       (copy-buffer-data device
       			command-pool
@@ -231,6 +253,7 @@
       			(buffer-handle staging-buffer)
       			gpu-buffer-ptr
       			size)
+      (displayln "ok creating a gpu local buffer for data" data)
       (make-buffer gpu-buffer-ptr memory size))))
 
 
@@ -244,7 +267,7 @@
 ;; (define memory-requirements (get-memory-requirements buffer))
 
 (define physical-device (vulkan-state-physical-device vs))
-(define buf (create-host-buffer physical-device device vertices))
+;; (define buf (create-host-buffer physical-device device vertices))
 
 (define graphics-queue (car (vulkan-state-queues vs)))
 (define vertex-buffer (create-gpu-local-buffer physical-device
@@ -252,6 +275,12 @@
 					       graphics-queue
 					       vertices
 					       vk-buffer-usage-vertex-buffer-bit))
+
+(define index-buffer (create-gpu-local-buffer physical-device
+					      device
+					      graphics-queue
+					      indices
+					      vk-buffer-usage-index-buffer-bit))
 
 ;; (define memory (buffer-memory buf))
 ;; (define data-size (buffer-size buf))
@@ -264,6 +293,8 @@
 ;;   (lambda (device command-pool graphics-queue)
 ;;     ))
 
-;; (begin (load "vk.scm")
-;;        (load "vulkan/pipeline.scm")
-;;        (load "vulkan/buffers.scm"))
+#!eof
+
+(begin (load "vk.scm")
+       (load "vulkan/pipeline.scm")
+       (load "vulkan/buffers.scm"))

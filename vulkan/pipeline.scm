@@ -377,6 +377,8 @@
 		       (make-vertex-input '#2( 0.5  0.5) '#3(0.0 1.0 0.0))
 		       (make-vertex-input '#2(-0.5  0.5) '#3(0.0 0.0 1.0))))
 
+(define indices (list 0 1 2 2 3 0 4 5 6 6 7 4))
+
 (define stride 4)
 
 (define shaders (make-shaders "shaders/shader.vert" "shaders/shader.frag"))
