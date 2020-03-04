@@ -537,3 +537,8 @@
   (vk-memory-property-protected-bit  #x00000020)
   (vk-memory-property-device-coherent-bit-amd  #x00000040)
   (vk-memory-property-device-uncached-bit-amd  #x00000080))
+
+(define-enum-ftype vk-command-buffer-usage-flag-bits
+  (vk-command-buffer-usage-one-time-submit-bit  #x00000001)
+  (vk-command-buffer-usage-render-pass-continue-bit  #x00000002)
+  (vk-command-buffer-usage-simultaneous-use-bit  #x00000004))

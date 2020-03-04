@@ -63,6 +63,16 @@
 		    vals)
        (* 4 (length vals))))))
 
+(define vertices->vector
+  (lambda (vertices)
+    (apply vector-append
+	   (map (lambda (v)
+		  (vector-append (vertex-input-position v) (vertex-input-color v)))
+		vertices))))
+
+(define vertices->list
+  (lambda (vertices) (vector->list (vertices->vector vertices))))
+
 
 (define vertices->bytevector
   (lambda (vertices)

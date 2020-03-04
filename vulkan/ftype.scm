@@ -12,6 +12,8 @@
 (define-ftype u32 unsigned-32)
 (define-ftype flags uint32-t)
 
+(define-collection-lambdas float)
+
 (define-ftype vk-bool32 unsigned-32)
 (define vk-true 1)
 (define vk-false 0)
@@ -69,9 +71,10 @@
 
 		    (define ffi-proc
 		      (lambda (arg-names ...)
-			(case (_ffi-proc arg-names ...)
-			  ((0) #t)
-			  (else (error "vulkan command failed" command-name))))))))])))
+			(let ((res (_ffi-proc arg-names ...)))
+			  (case res
+			    ((0) #t)
+			    (else (error "vulkan command failed" command-name res)))))))))])))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;
@@ -1025,8 +1028,35 @@
 
 (define-render-pass-command vk-cmd-end-render-pass)
 
+(define-foreign-struct vk-buffer-copy
+  ((src-offset . vk-device-size)
+   (dst-offset . vk-device-size)
+   (size . vk-device-size)))
+
+(define-render-pass-command vk-cmd-copy-buffer
+  ((& vk-buffer) (& vk-buffer) u32 (* vk-buffer-copy)))
 
 
+;; ftypes to submit command buffer to queue
+
+(define-ftype vk-semaphore uptr)
+(define-ftype vk-fence uptr)
+
+(define-vulkan-struct vk-submit-info
+  ((wait-semaphore-count . u32)
+   (wait-semaphores . (* vk-semaphore))
+   (wait-dst-stage-mask . (* flags))
+   (command-buffer-count . u32)
+   (command-buffers . (* vk-command-buffer))
+   (signal-semaphore-count . u32)
+   (signal-semaphores . (* vk-semaphore))))
+
+(define-vulkan-command vkQueueSubmit
+  ((& vk-queue) u32 (* vk-submit-info) (& vk-fence)))
+
+(define-vulkan-command vkQueueWaitIdle ((& vk-queue)))
+
+(define-vulkan-command vkDeviceWaitIdle ((& vk-device)))
 
 
 
