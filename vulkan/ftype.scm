@@ -1079,6 +1079,7 @@
 
 ;; descriptor sets
 (define-ftype vk-descriptor-set uptr)
+(define-collection-lambdas vk-descriptor-set)
 
 (define-vulkan-struct vk-descriptor-set-allocate-info
   ((descriptor-pool . vk-descriptor-pool)
@@ -1087,6 +1088,33 @@
 
 (define-vulkan-command vkAllocateDescriptorSets
   ((& vk-device) (* vk-descriptor-set-allocate-info) (* vk-descriptor-set)))
+
+;; update descriptor sets
+
+(define-ftype vk-buffer-view uptr)
+
+(define-foreign-struct vk-descriptor-image-info
+  ((sampler . vk-sampler)
+   (image-view . vk-image-view)
+   (image-layout . vk-image-layout)))
+
+(define-foreign-struct vk-descriptor-buffer-info
+  ((buffer . vk-buffer)
+   (offset . vk-device-size)
+   (range . vk-device-size)))
+
+(define-vulkan-struct vk-write-descriptor-set
+  ((dst-set . vk-descriptor-set)
+   (dst-binding . u32)
+   (dst-array-element . u32)
+   (descriptor-count . u32)
+   (descriptor-type . vk-descriptor-type)
+   (image-info . (* vk-descriptor-image-info))
+   (buffer-info . (* vk-descriptor-buffer-info))
+   (texel-buffer-view . (* vk-buffer-view))))
+
+(define-vulkan-command vkUpdateDescriptorSets
+  ((& vk-device) u32 (* vk-write-descriptor-set) u32 uptr))
 
 
 

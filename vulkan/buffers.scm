@@ -120,7 +120,10 @@
     ((device buffer-size mode) (create-new-buffer device buffer-size mode #f))
     ((device buffer-size mode usage-flags)
      (let* ((usage (case mode
-		     ((host-local) vk-buffer-usage-transfer-src-bit)
+		     ((host-local) (if usage-flags
+				       (bitwise-ior vk-buffer-usage-transfer-src-bit
+						    usage-flags)
+				       vk-buffer-usage-transfer-src-bit))
 		     ((gpu-local) (if usage-flags
 				      (bitwise-ior vk-buffer-usage-transfer-dst-bit
 						   usage-flags)
@@ -314,19 +317,49 @@
 
 
 (define create-descriptor-sets
-  (lambda (device descriptor-pool descriptor-layout num-sets)
-    (let* ((layouts (array-pointer-raw-ptr
-		     (list->vk-descriptor-set-layout-pointer-array
-		      (map (lambda (i) descriptor-layout) (iota num-sets)))))
-	   (alloc-info (make-vk-descriptor-set-allocate-info
-			descriptor-set-allocate-info
-			0
-			(pointer-ref-value descriptor-pool)
-			num-sets
-			layouts))
-	   (set (make-foreign-array vk-descriptor-set num-sets)))
-      (vk-allocate-descriptor-sets device alloc-info set)
-      set)))
+  (lambda (device descriptor-pool descriptor-layout uniform-buffers)
+
+    (define num-sets (length uniform-buffers))
+
+    ;; uniform buffer  object suze
+    (define ubo-size (data-size uniform-buffer-data-list))
+
+    (define allocate-descriptor-sets
+      (lambda ()
+	(let* ((layouts (array-pointer-raw-ptr
+			 (list->vk-descriptor-set-layout-pointer-array
+			  (map (lambda (i) descriptor-layout) (iota num-sets)))))
+	       (alloc-info (make-vk-descriptor-set-allocate-info
+			    descriptor-set-allocate-info
+			    0
+			    (pointer-ref-value descriptor-pool)
+			    num-sets
+			    layouts))
+	       (set (make-foreign-array vk-descriptor-set num-sets)))
+	  (vk-allocate-descriptor-sets device alloc-info set)
+	  (make-array-pointer num-sets set 'vk-descriptor-set))))
+
+    (let ((descriptor-sets  (allocate-descriptor-sets)))
+      (map (lambda (uniform-buffer descriptor-set)
+	     (let* ((buffer-info
+		     (make-vk-descriptor-buffer-info (pointer-ref-value uniform-buffer)
+						     0
+						     ubo-size))
+		    (write
+		     (make-vk-write-descriptor-set write-descriptor-set
+						   0
+						   (pointer-ref-value descriptor-set)
+						   0
+						   0
+						   1
+						   vk-descriptor-type-uniform-buffer
+						   (null-pointer vk-descriptor-image-info)
+						   buffer-info
+						   (null-pointer vk-buffer-view))))
+	       (vk-update-descriptor-sets device 1 write 0 0)
+	       descriptor-set))
+	   (map buffer-handle uniform-buffers)
+	   (vk-descriptor-set-pointer-map (lambda (x) x) descriptor-sets)))))
 
 ;; Sample usage
 
@@ -377,7 +410,11 @@
 (define descriptor-layout (pipeline-descriptor-set-layout pipeline))
 (define num-sets (length uniform-buffers))
 
-(define sets (create-descriptor-sets device descriptor-pool descriptor-layout num-sets))
+(define sets (create-descriptor-sets device
+				     descriptor-pool
+				     descriptor-layout
+				     uniform-buffers))
+
 
 ;; (define memory (buffer-memory buf))
 ;; (define data-size (buffer-size buf))
