@@ -542,3 +542,19 @@
   (vk-command-buffer-usage-one-time-submit-bit  #x00000001)
   (vk-command-buffer-usage-render-pass-continue-bit  #x00000002)
   (vk-command-buffer-usage-simultaneous-use-bit  #x00000004))
+
+
+(define-enum-ftype vk-descriptor-type
+  (vk-descriptor-type-sampler  0)
+  (vk-descriptor-type-combined-image-sampler  1)
+  (vk-descriptor-type-sampled-image  2)
+  (vk-descriptor-type-storage-image  3)
+  (vk-descriptor-type-uniform-texel-buffer  4)
+  (vk-descriptor-type-storage-texel-buffer  5)
+  (vk-descriptor-type-uniform-buffer  6)
+  (vk-descriptor-type-storage-buffer  7)
+  (vk-descriptor-type-uniform-buffer-dynamic  8)
+  (vk-descriptor-type-storage-buffer-dynamic  9)
+  (vk-descriptor-type-input-attachment  10)
+  (vk-descriptor-type-inline-uniform-block-ext  1000138000)
+  (vk-descriptor-type-acceleration-structure-nv  1000165000))

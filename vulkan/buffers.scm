@@ -295,7 +295,22 @@
 			       vk-buffer-usage-uniform-buffer-bit))
 	 (iota num-buffers))))
 
-#!eof
+
+;; Descriptor sets and pools
+
+;; used to pass on data like uniform buffers and textures to the shaders
+
+(define create-descriptor-pool
+  (lambda (device descriptor-count)
+    (let* ((pool-size (make-vk-descriptor-pool-size vk-descriptor-type-uniform-buffer
+						    descriptor-count))
+	   (info (make-vk-descriptor-pool-create-info descriptor-pool-create-info 0 0
+						      descriptor-count
+						      1
+						      pool-size))
+	   (pool (make-foreign-object vk-descriptor-pool)))
+      (vk-create-descriptor-pool device info 0 pool)
+      pool)))
 
 ;; Sample usage
 
@@ -325,6 +340,7 @@
 
 (define image-view (car image-views))
 (define framebuffers (create-framebuffers device swapchain-details pipeline))
+(define swapchain (vulkan-state-swapchain vs))
 
 (define extent (swapchain-extent (vulkan-state-swapchain vs)))
 
@@ -337,6 +353,13 @@
 			  uniform-buffer-data-list
 			  (length framebuffers)))
 
+(define descriptor-count (length uniform-buffers))
+
+(define descriptor-pool (create-descriptor-pool device
+						(length uniform-buffers)))
+
+
+
 ;; (define memory (buffer-memory buf))
 ;; (define data-size (buffer-size buf))
 
@@ -348,6 +371,7 @@
 ;;   (lambda (device command-pool graphics-queue)
 ;;     ))
 
+#!eof
 
 (begin (load "vk.scm")
        (load "vulkan/pipeline.scm")

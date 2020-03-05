@@ -1060,7 +1060,21 @@
 (define-vulkan-command vkDeviceWaitIdle ((& vk-device)))
 
 
+;; descriptor pool
+(define-ftype vk-descriptor-pool uptr)
 
+(define-foreign-struct vk-descriptor-pool-size
+  ((type . vk-descriptor-type)
+   (descriptor-count . u32)))
+
+(define-vulkan-struct vk-descriptor-pool-create-info
+  ((flags . flags)
+   (max-sets . u32)
+   (pool-size-count . u32)
+   (pool-sizes . (* vk-descriptor-pool-size))))
+
+(define-vulkan-command vkCreateDescriptorPool
+  ((& vk-device) (* vk-descriptor-pool-create-info) uptr (* vk-descriptor-pool)))
 
 
 #!eof
