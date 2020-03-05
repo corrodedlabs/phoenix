@@ -680,6 +680,8 @@
 
 (define-ftype vk-descriptor-set-layout uptr)
 
+(define-collection-lambdas vk-descriptor-set-layout)
+
 (define-enum-ftype vk-descriptor-type
   vk-descriptor-type-sampler
   vk-descriptor-type-combined-image-sampler
@@ -826,6 +828,7 @@
 (define-vulkan-command vkCreateRenderPass
   ((& vk-device) (* vk-render-pass-create-info) uptr (* vk-render-pass)))
 
+
 ;; pipeline
 
 (define-vulkan-struct vk-graphics-pipeline-create-info
@@ -950,8 +953,6 @@
 
 (define-vulkan-command vkResetCommandPool ((& vk-device) (& vk-command-pool) flags))
 
-;; Descriptor sets
-
 
 
 ;; Command buffers
@@ -1075,6 +1076,18 @@
 
 (define-vulkan-command vkCreateDescriptorPool
   ((& vk-device) (* vk-descriptor-pool-create-info) uptr (* vk-descriptor-pool)))
+
+;; descriptor sets
+(define-ftype vk-descriptor-set uptr)
+
+(define-vulkan-struct vk-descriptor-set-allocate-info
+  ((descriptor-pool . vk-descriptor-pool)
+   (descriptor-set-count . u32)
+   (set-layouts . (* vk-descriptor-set-layout))))
+
+(define-vulkan-command vkAllocateDescriptorSets
+  ((& vk-device) (* vk-descriptor-set-allocate-info) (* vk-descriptor-set)))
+
 
 
 #!eof

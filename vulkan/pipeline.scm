@@ -214,17 +214,42 @@
 						    color-attachment
 						    '(0.0 0.0 0.0 0.0))))
 
+
+;; descriptor set layout
+
+(define create-descriptor-layout
+  (lambda (device)
+    (let* ((binding
+	    (make-vk-descriptor-set-layout-binding 0
+						   vk-descriptor-type-uniform-buffer
+						   1
+						   vk-shader-stage-vertex-bit
+						   (null-pointer vk-sampler)))
+	   (info (make-vk-descriptor-set-layout-create-info
+		  descriptor-set-layout-create-info
+		  0
+		  0
+		  1
+		  binding))
+	   (layout (make-foreign-object vk-descriptor-set-layout)))
+      (vk-create-descriptor-set-layout device info 0 layout)
+      layout)))
+
+
 ;; pipeline layout
 
+;; returns (pipeline-layout . descriptor-layout)
 (define (create-pipeline-layout device)
-  (let ((layout-info (make-vk-pipeline-layout-create-info pipeline-layout-create-info 0 0
-							  0
-							  (null-pointer vk-descriptor-set-layout)
-							  0
-							  (null-pointer vk-push-constant-range)))
-	(layout (make-foreign-object vk-pipeline-layout)))
+  (let* ((descriptor-layout (create-descriptor-layout device))
+	 (layout-info
+	  (make-vk-pipeline-layout-create-info pipeline-layout-create-info 0 0
+					       1
+					       descriptor-layout
+					       0
+					       (null-pointer vk-push-constant-range)))
+	 (layout (make-foreign-object vk-pipeline-layout)))
     (vk-create-pipeline-layout device layout-info 0 layout)
-    layout))
+    (cons layout descriptor-layout)))
 
 ;; let's capture all the custom information that can be supplied in the pipeline in a record
 
@@ -315,7 +340,7 @@
 
 	   (render-pass (create-render-pass device swapchain))
 
-	   (pipeline-layout (create-pipeline-layout device))
+	   (layout (create-pipeline-layout device))
 
 	   (pipeline-info
 	    (make-vk-graphics-pipeline-create-info
@@ -352,7 +377,7 @@
 
 	     (null-pointer vk-pipeline-dynamic-state-create-info)
 
-	     (pointer-ref-value pipeline-layout)
+	     (pointer-ref-value (car layout))
 
 	     (pointer-ref-value render-pass)
 
@@ -366,7 +391,7 @@
 				    pipeline-info
 				    0
 				    pipeline)
-      (make-pipeline pipeline pipeline-layout render-pass #f))))
+      (make-pipeline pipeline (car layout) render-pass (cdr layout)))))
 
 ;; samplte usage
 

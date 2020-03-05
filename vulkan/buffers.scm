@@ -312,6 +312,22 @@
       (vk-create-descriptor-pool device info 0 pool)
       pool)))
 
+
+(define create-descriptor-sets
+  (lambda (device descriptor-pool descriptor-layout num-sets)
+    (let* ((layouts (array-pointer-raw-ptr
+		     (list->vk-descriptor-set-layout-pointer-array
+		      (map (lambda (i) descriptor-layout) (iota num-sets)))))
+	   (alloc-info (make-vk-descriptor-set-allocate-info
+			descriptor-set-allocate-info
+			0
+			(pointer-ref-value descriptor-pool)
+			num-sets
+			layouts))
+	   (set (make-foreign-array vk-descriptor-set num-sets)))
+      (vk-allocate-descriptor-sets device alloc-info set)
+      set)))
+
 ;; Sample usage
 
 (define size (fold-left + 0 (map vertex-input-total-size vertices)))
@@ -358,7 +374,10 @@
 (define descriptor-pool (create-descriptor-pool device
 						(length uniform-buffers)))
 
+(define descriptor-layout (pipeline-descriptor-set-layout pipeline))
+(define num-sets (length uniform-buffers))
 
+(define sets (create-descriptor-sets device descriptor-pool descriptor-layout num-sets))
 
 ;; (define memory (buffer-memory buf))
 ;; (define data-size (buffer-size buf))
