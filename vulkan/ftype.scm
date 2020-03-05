@@ -893,7 +893,7 @@
 		     ((& vk-physical-device) (* vk-physical-device-memory-properties))
 		     void))
 
-(define-vulkan-struct vk-memory-requirements
+(define-foreign-struct vk-memory-requirements
   ((size . vk-device-size)
    (alignment . vk-device-size)
    (memory-type-bits . unsigned-32)))

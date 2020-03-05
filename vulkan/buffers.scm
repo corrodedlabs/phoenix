@@ -23,9 +23,6 @@
 	     framebuffer))
 	 (swapchain-image-views swapchain))))
 
-(define image-view (car image-views))
-(define framebuffers (create-framebuffers device swapchain-details pipeline))
-
 
 ;; Command pool
 
@@ -37,6 +34,7 @@
       (vk-create-command-pool device info 0 command-pool)
       command-pool)))
 
+(define device (vulkan-state-device vs))
 (define queue-index (vulkan-state-queue-index vs))
 (define command-pool (create-command-pool device queue-index))
 
@@ -119,12 +117,14 @@
 
 (define create-new-buffer
   (case-lambda
-    ((device buffer-size mode) (create-new-buffer device buffer-size mode 0))
+    ((device buffer-size mode) (create-new-buffer device buffer-size mode #f))
     ((device buffer-size mode usage-flags)
      (let* ((usage (case mode
 		     ((host-local) vk-buffer-usage-transfer-src-bit)
-		     ((gpu-local) (bitwise-ior vk-buffer-usage-transfer-dst-bit
-					       usage-flags))))
+		     ((gpu-local) (if usage-flags
+				      (bitwise-ior vk-buffer-usage-transfer-dst-bit
+						   usage-flags)
+				      vk-buffer-usage-transfer-dst-bit))))
 	    (info (make-vk-buffer-create-info buffer-create-info 0 0
 					      buffer-size
 					      usage
@@ -132,6 +132,7 @@
 					      0
 					      (null-pointer unsigned-32)))
 	    (buffer (make-foreign-object vk-buffer)))
+       (displayln "usage flags:" usage-flags)
        (displayln "creating buffer fir " usage)
        (vk-create-buffer device info 0 buffer)
        buffer))))
@@ -212,13 +213,23 @@
 			    (ftype-set! float () ptr value)
 			    ptr)) 
 			(vertices->list data))))
-		 ((number? (car data)) (list->u32-pointer-array
-					(map (lambda (value)
-					       (displayln "setting value" value)
-					       (let ((ptr (make-foreign-object u32)))
-						 (ftype-set! u32 () ptr value)
-						 ptr)) 
-					     data))))))
+
+		 ((inexact? (car data))
+		  (list->float-pointer-array
+		   (map (lambda (value)
+			  (let ((ptr (make-foreign-object float)))
+			    (ftype-set! float () ptr value)
+			    ptr))
+			data)))
+
+		 ((number? (car data))
+		  (list->u32-pointer-array
+		   (map (lambda (value)
+			  (displayln "setting value" value)
+			  (let ((ptr (make-foreign-object u32)))
+			    (ftype-set! u32 () ptr value)
+			    ptr)) 
+			data))))))
 	      size)
       (vk-unmap-memory device memory))))
 
@@ -226,15 +237,16 @@
 ;; buffer created using HOST_VISIBLE and HOST_COHERENT
 ;; can be used as staging buffer
 (define create-host-buffer
-  (lambda (physical-device device data)
-
-    (let* ((size (data-size data))
-	   (buffer-ptr (create-new-buffer device size host-local))
-	   (memory (allocate-memory physical-device device buffer-ptr host-local)))
-      (vk-bind-buffer-memory device buffer-ptr memory 0)
-      (copy-data device memory data)
-      (displayln "ok creating a host local buffer for data" data)
-      (make-buffer buffer-ptr memory size))))
+  (case-lambda
+    ((physical-device device data) (create-host-buffer physical-device device data #f))
+    ((physical-device device data usage)
+     (let* ((size (data-size data))
+	    (buffer-ptr (create-new-buffer device size host-local usage))
+	    (memory (allocate-memory physical-device device buffer-ptr host-local)))
+       (vk-bind-buffer-memory device buffer-ptr memory 0)
+       (copy-data device memory data)
+       (displayln "ok creating a host local buffer for data" data)
+       (make-buffer buffer-ptr memory size)))))
 
 ;; create high performance gpu buffer
 ;; a staging buffer will be used to copy the data over
@@ -245,7 +257,6 @@
 	   (size (data-size data))
 	   (gpu-buffer-ptr (create-new-buffer device size gpu-local usage))
 	   (memory (allocate-memory physical-device device gpu-buffer-ptr gpu-local)))
-      (displayln "fuck thi " size)
       (vk-bind-buffer-memory device gpu-buffer-ptr memory 0)
       (copy-buffer-data device
       			command-pool
@@ -253,9 +264,38 @@
       			(buffer-handle staging-buffer)
       			gpu-buffer-ptr
       			size)
-      (displayln "ok creating a gpu local buffer for data" data)
+      (displayln "creating a gpu local buffer for data" data)
       (make-buffer gpu-buffer-ptr memory size))))
 
+
+;; Uniform buffers
+
+(define-record-type uniform-buffer-data (fields model view projection))
+
+(define (uniform-buffer-data->list data)
+  (append (uniform-buffer-data-model data)
+	  (uniform-buffer-data-projection data)
+	  (uniform-buffer-data-view data)))
+
+(define (extent->uniform-buffer-data extent)
+  (let ((width (vk-extent-2d-width extent))
+	(height (vk-extent-2d-height extent)))
+    (make-uniform-buffer-data (list 0.0 0.0 0.0 0.0)
+			      (list 0.0 0.0 0.0 0.0)
+			      (list 0.0 0.0 0.0 0.0))))
+
+
+
+(define create-uniform-buffers
+  (lambda (physical-device device data num-buffers)
+    (map (lambda (i)
+	   (create-host-buffer physical-device
+			       device
+			       data
+			       vk-buffer-usage-uniform-buffer-bit))
+	 (iota num-buffers))))
+
+#!eof
 
 ;; Sample usage
 
@@ -282,6 +322,21 @@
 					      indices
 					      vk-buffer-usage-index-buffer-bit))
 
+
+(define image-view (car image-views))
+(define framebuffers (create-framebuffers device swapchain-details pipeline))
+
+(define extent (swapchain-extent (vulkan-state-swapchain vs)))
+
+(define uniform-buffer-data-list
+  (uniform-buffer-data->list (extent->uniform-buffer-data extent)))
+
+(define uniform-buffers
+  (create-uniform-buffers physical-device
+			  device
+			  uniform-buffer-data-list
+			  (length framebuffers)))
+
 ;; (define memory (buffer-memory buf))
 ;; (define data-size (buffer-size buf))
 
@@ -293,7 +348,6 @@
 ;;   (lambda (device command-pool graphics-queue)
 ;;     ))
 
-#!eof
 
 (begin (load "vk.scm")
        (load "vulkan/pipeline.scm")
