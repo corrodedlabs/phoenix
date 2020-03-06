@@ -84,6 +84,132 @@
 			   vk-image-usage-depth-stencil-attachment-bit
 			   vk-image-aspect-depth-bit)))
 
+(define allocate-image-memory
+  (lambda (physical-device device image-handle)
+
+    (define (memory-requirements)
+      (let ((memory-requirements (make-foreign-object vk-memory-requirements)))
+	(vk-get-image-memory-requirements device image-handle memory-requirements)
+	memory-requirements))
+
+    (let* ((requirements (memory-requirements))
+	   (alloc-info (make-vk-memory-allocate-info
+			memory-allocate-info
+			0
+			(vk-memory-requirements-size requirements)
+			(find-memory-type-index physical-device
+						(vk-memory-requirements-memory-type-bits
+						 requirements)
+						vk-memory-property-device-local-bit)))
+	   (memory (make-foreign-object vk-device-memory)))
+      (vk-allocate-memory device alloc-info 0 memory)
+      memory)))
+
+(define bind-image-memory
+  (lambda (device image-handle memory)
+    (vk-bind-image-memory device image-handle memory 0)))
+
+
+;; Transition barriers
+
+;; uses command buffers to move images to different stages
+
+(define-record-type transition-barrier-info
+  (fields src-access-mask src-stage dst-access-mask dst-stage))
+
+;; returns barrier info for performing the transition from 'old-layout' to 'new-layout'
+(define layout-transition->barrier-info
+  (lambda (old-layout new-layout)
+    (cond 
+     ((equal? old-layout vk-image-layout-undefined)
+      (cond 
+       ((equal? new-layout vk-image-layout-transfer-dst-optimal)
+	(make-transition-barrier-info 0
+				      vk-pipeline-stage-top-of-pipe-bit
+				      vk-access-transfer-write-bit
+				      vk-pipeline-stage-transfer-bit))
+
+       ((equal? new-layout vk-image-layout-depth-stencil-attachment-optimal)
+	(make-transition-barrier-info 0
+				      vk-pipeline-stage-top-of-pipe-bit
+				      (bitwise-ior
+				       vk-access-depth-stencil-attachment-read-bit
+				       vk-access-depth-stencil-attachment-write-bit)
+				      vk-pipeline-stage-early-fragment-tests-bit))
+
+       ((equal? new-layout vk-image-layout-color-attachment-optimal)
+	(make-transition-barrier-info 0
+				      vk-pipeline-stage-top-of-pipe-bit
+				      (bitwise-ior vk-access-color-attachment-read-bit
+						   vk-access-color-attachment-write-bit)
+				      vk-pipeline-stage-color-attachment-output-bit))
+       
+       (else (error "unsupported new-layout in " (list old-layout "=>" new-layout)))))
+
+     ((and (equal? old-layout vk-image-layout-transfer-dst-optimal)
+	 (and (equal? new-layout vk-image-layout-shader-read-only-optimal)))
+      (make-transition-barrier-info vk-access-transfer-write-bit
+				    vk-pipeline-stage-transfer-bit
+				    vk-access-shader-read-bit
+				    vk-pipeline-stage-fragment-shader-bit))
+
+     (else (error "unsupported transition " (list old-layout "=>" new-layout))))))
+
+
+(define stencil-component-present?
+  (lambda (format)
+    (or (equal? format vk-format-d32-sfloat-s8-uint)
+       (equal? format vk-format-d24-unorm-s8-uint))))
+
+(define transition-image-layout
+  (lambda (device command-pool graphics-queue format image-handle old-layout new-layout)
+    (match (layout-transition->barrier-info old-layout new-layout)
+      (($ transition-barrier-info
+	  src-access-mask src-stage dst-access-mask dst-stage)
+       (let* ((aspect-mask (cond
+			    ((and (equal? new-layout
+					vk-image-layout-depth-stencil-attachment-optimal)
+				(stencil-component-present? format))
+			     (bitwise-ior vk-image-aspect-depth-bit
+					  vk-image-aspect-stencil-bit))
+
+			    ((equal? new-layout
+				     vk-image-layout-depth-stencil-attachment-optimal)
+			     vk-image-aspect-depth-bit)
+
+			    (else vk-image-aspect-color-bit)))
+	      (subresource-range
+	       (make-vk-image-subresource-range aspect-mask
+						0
+						1 ;;miplevels <level count>
+						0
+						1))
+	      (image-barrier (make-vk-image-memory-barrier image-memory-barrier
+							   0
+							   src-access-mask
+							   dst-access-mask
+							   old-layout
+							   new-layout
+							   0
+							   0
+							   (pointer-ref-value image-handle)
+							   subresource-range)))
+	 (execute-command-buffer device
+				 command-pool
+				 graphics-queue
+				 (lambda (command-buffer)
+				   (vk-cmd-pipeline-barrier command-buffer
+							    src-stage
+							    dst-stage
+							    0
+							    0
+							    0
+							    0
+							    0
+							    1
+							    image-barrier)))))
+      
+      (else (error "could not transition to " new-layout)))))
 
 (define extent (swapchain-extent swapchain))
 
@@ -91,3 +217,17 @@
 
 (define depth-image-handle (create-image-handle device depth-property))
 
+(define memory (allocate-image-memory physical-device device depth-image-handle ))
+
+(bind-image-memory device depth-image-handle memory)
+
+(layout-transition->barrier-info vk-image-layout-undefined
+				 vk-image-layout-depth-stencil-attachment-optimal)
+
+(transition-image-layout device
+			 command-pool
+			 graphics-queue
+			 supported-format
+			 depth-image-handle
+			 vk-image-layout-undefined
+			 vk-image-layout-depth-stencil-attachment-optimal)

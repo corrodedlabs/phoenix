@@ -82,23 +82,6 @@
 
 ;; Buffers
 
-(define find-memory-type-index
-  (lambda (physical-device required-type required-properties)
-    (let ((properties (make-foreign-object vk-physical-device-memory-properties)))
-      (vk-get-physical-device-memory-properties physical-device properties)      
-      (find (lambda (i)
-	      (displayln "checking index:" i)
-	      (and (bitwise-and required-type
-			      (bitwise-arithmetic-shift-left i 1))
-		 (equal? required-properties
-			 (bitwise-and (ftype-ref vk-physical-device-memory-properties
-						 (memory-types i property-flags)
-						 properties)
-				      required-properties))))
-	    (iota (ftype-ref vk-physical-device-memory-properties
-			     (memory-type-count)
-			     properties))))))
-
 ;; functions to work with gpu buffers
 
 (define-record-type buffer (fields handle memory size))

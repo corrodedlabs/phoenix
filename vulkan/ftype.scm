@@ -385,6 +385,8 @@
 (define-vulkan-command vkGetSwapchainImagesKHR
   ((& vk-device) (& vk-swapchain) (* unsigned-32) (* vk-image)))
 
+
+
 ;; swapchain image views
 
 (define-enum-ftype vk-image-view-create-flag-bits
@@ -463,6 +465,24 @@
    (queue-family-index-count . u32)
    (queue-family-indices . (* u32))
    (initial-layout . vk-image-layout)))
+
+(define vk-get-image-memory-requirements
+  (foreign-procedure "vkGetImageMemoryRequirements"
+		     ((& vk-device) (& vk-image) (* vk-memory-requirements))
+		     void))
+
+;; image barriers
+
+(define-vulkan-struct vk-image-memory-barrier
+  ((src-access-mask . flags)
+   (dst-access-mask . flags)
+   (old-layout . vk-image-layout)
+   (new-layout . vk-image-layout)
+   (src-queue-family-index . u32)
+   (dst-queue-family-index . u32)
+   (image . vk-image)
+   (subresource-range . vk-image-subresource-range)))
+
 
 (define-vulkan-command vkCreateImage
   ((& vk-device) (* vk-image-create-info) uptr (* vk-image)))
@@ -944,6 +964,9 @@
 (define-vulkan-command vkBindBufferMemory
   ((& vk-device) (& vk-buffer) (& vk-device-memory) vk-device-size))
 
+(define-vulkan-command vkBindImageMemory
+  ((& vk-device) (& vk-image) (& vk-device-memory) vk-device-size))
+
 (define-vulkan-command vkMapMemory
   ((& vk-device) (& vk-device-memory) vk-device-size vk-device-size flags uptr))
 
@@ -1046,9 +1069,12 @@
 (define-render-pass-command vk-cmd-bind-index-buffer
   (vk-buffer vk-device-size vk-index-type))
 
-;; (define-render-pass-command vk-cmd-bind-descriptor-sets
-;;   (vk-pipeline-bind-point vk-pipeline-layout unsigned-32 unsigned-32
-;; 			  (* vk-descriptor-set) unsigned-32 (* unsigned-32)))
+(define-render-pass-command vk-cmd-bind-descriptor-sets
+  (vk-pipeline-bind-point vk-pipeline-layout unsigned-32 unsigned-32
+			  (* vk-descriptor-set) unsigned-32 (* unsigned-32)))
+
+(define-render-pass-command vk-cmd-pipeline-barrier
+  (flags flags flags u32 uptr u32 uptr u32 (* vk-image-memory-barrier)))
 
 (define-render-pass-command vk-cmd-draw-indexed
   (unsigned-32 unsigned-32 unsigned-32 int unsigned-32))
