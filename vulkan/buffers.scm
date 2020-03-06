@@ -38,47 +38,106 @@
 (define queue-index (vulkan-state-queue-index vs))
 (define command-pool (create-command-pool device queue-index))
 
+(define allocate-command-buffers
+  (case-lambda
+    ((device command-pool) (allocate-command-buffers device command-pool 1))
+    ((device command-pool num-buffer)
+     (let ((info (make-vk-command-buffer-allocate-info command-buffer-allocate-info
+						       0
+						       (pointer-ref-value command-pool)
+						       vk-command-buffer-level-primary
+						       num-buffer))
+	   (command-buffer (if (fx=? num-buffer 1)
+			       (make-foreign-object vk-command-buffer)
+			       (make-foreign-array vk-command-buffer num-buffer))))
+       (vk-allocate-command-buffers device info command-buffer)
+       command-buffer))))
+
+(define start-command-buffer-recording
+  (lambda (command-buffer one-time-submit?)
+    (let ((begin-info (make-vk-command-buffer-begin-info
+		       command-buffer-begin-info
+		       0
+		       (if one-time-submit?
+			 vk-command-buffer-usage-one-time-submit-bit
+			 0)
+		       (null-pointer vk-command-buffer-inheritance-info))))
+      (vk-begin-command-buffer command-buffer begin-info)
+      command-buffer)))
+
+(define end-command-buffer-recording
+  (case-lambda
+    ((command-buffer)
+     (vk-end-command-buffer command-buffer))
+    ((command-buffer graphics-queue)
+     (end-command-buffer-recording command-buffer)
+     (let ((submit-info (make-vk-submit-info submit-info 0
+					     0
+					     (null-pointer vk-semaphore)
+					     (null-pointer flags)
+					     1
+					     command-buffer
+					     0
+					     (null-pointer vk-semaphore))))
+       (vk-queue-submit graphics-queue 1 submit-info 0)
+       (vk-queue-wait-idle graphics-queue)))))
+
 ;; creates and submits a single command buffer
 ;; the created command buffer is passed to the function f
 ;; once f returns the command buffer is submitted to the queue and
 ;; we wait for device idle
 (define execute-command-buffer
   (lambda (device command-pool graphics-queue f)
-    (let ((command-buffer (make-foreign-object vk-command-buffer)))
+    (let ((command-buffer #f))
       (dynamic-wind
 	(lambda ()
-	  (let ((info
-		 (make-vk-command-buffer-allocate-info command-buffer-allocate-info
-						       0
-						       (pointer-ref-value command-pool)
-						       vk-command-buffer-level-primary
-						       1
-						       0))
-		(begin-info (make-vk-command-buffer-begin-info
-			     command-buffer-begin-info
-			     0
-			     vk-command-buffer-usage-one-time-submit-bit
-			     (null-pointer vk-command-buffer-inheritance-info))))
-	    (vk-allocate-command-buffers device info command-buffer)
-	    (vk-begin-command-buffer command-buffer begin-info)))
+	  (set! command-buffer
+	    (start-command-buffer-recording (allocate-command-buffers device command-pool)
+					    #t)))
 	(lambda ()
 	  (begin (f command-buffer)
-		 (let ((submit-info (make-vk-submit-info submit-info 0
-							 0
-							 (null-pointer vk-semaphore)
-							 (null-pointer flags)
-							 1
-							 command-buffer
-							 0
-							 (null-pointer vk-semaphore))))
-		   (vk-end-command-buffer command-buffer)
-		   (vk-queue-submit graphics-queue 1 submit-info 0)
-		   (vk-queue-wait-idle graphics-queue))))
+		 (end-command-buffer-recording command-buffer graphics-queue)))
 	(lambda ()
 	  ;; (vk-free-command-buffers device command-pool 1 command-buffer)
 	  #f
 	  )))))
 
+;; for test
+(define num-buffers 8)
+
+;; allocate 'num-buffers' command-buffers and record the command as passed in f
+;; to all of them
+;; f will also be passed the index of the buffer being recorded
+(define record-command-buffers
+  (lambda (device command-pool framebuffers f)
+    (let* ((command-buffers (allocate-command-buffers device command-pool num-buffers))
+	   (cmd-buffers-ptr (make-array-pointer num-buffers
+						command-buffers
+						'vk-command-buffer)))
+      
+      (map (lambda (cmd-buffer frame-buffer)
+	     (start-command-buffer-recording cmd-buffer)
+	     (f cmd-buffer frame-buffer)
+	     (end-command-buffer-recording cmd-buffer))
+	   (vk-command-buffer-pointer-map identity cmd-buffers-ptr)
+	   framebuffers)
+      command-buffers)))
+
+
+;; (define create-command-buffers
+;;   (lambda (device command-pool pipeline framebuffers)
+
+;;     (define clear-values
+;;       (lambda ()
+;; 	(let ((clear-value (make-vk-clear-color-value clear-values))
+;; 	      (depth-clear (make-vk-clear-depth-stencil-value 1.0 0.0)))
+;; 	  )))
+
+;;     (record-command-buffers device
+;; 			    command-pool
+;; 			    framebuffers
+;; 			    (lambda (cmd-buffer framebuffer)
+;; 			      ()))))
 
 ;; Buffers
 
@@ -343,9 +402,6 @@
 
 ;; Depth buffering
 
-(define depth-buffer-image
-  (create-depth-buffer-image physical-device device command-pool graphics-queue swapchain))
-
 
 
 ;; Sample usage
@@ -402,6 +458,10 @@
 				     descriptor-layout
 				     uniform-buffers))
 
+(define depth-buffer-image
+  (create-depth-buffer-image physical-device device command-pool graphics-queue swapchain))
+
+(define clear-values (list 0.0 0.0 0.0 1.0))
 
 ;; (define memory (buffer-memory buf))
 ;; (define data-size (buffer-size buf))

@@ -466,10 +466,6 @@
    (queue-family-indices . (* u32))
    (initial-layout . vk-image-layout)))
 
-(define vk-get-image-memory-requirements
-  (foreign-procedure "vkGetImageMemoryRequirements"
-		     ((& vk-device) (& vk-image) (* vk-memory-requirements))
-		     void))
 
 ;; image barriers
 
@@ -936,15 +932,26 @@
 	  (memory-heap-count u32)
 	  (memory-heaps (array 16 vk-memory-heap))))
 
+
+
+
 (define vk-get-physical-device-memory-properties
   (foreign-procedure "vkGetPhysicalDeviceMemoryProperties"
 		     ((& vk-physical-device) (* vk-physical-device-memory-properties))
 		     void))
 
+
 (define-foreign-struct vk-memory-requirements
   ((size . vk-device-size)
    (alignment . vk-device-size)
    (memory-type-bits . unsigned-32)))
+
+(define vk-get-image-memory-requirements
+  (foreign-procedure "vkGetImageMemoryRequirements"
+		     ((& vk-device) (& vk-image) (* vk-memory-requirements))
+		     void))
+
+
 
 (define vk-get-buffer-memory-requirements
   (foreign-procedure "vkGetBufferMemoryRequirements"
@@ -1005,6 +1012,7 @@
 
 ;; Command buffers
 (define-ftype vk-command-buffer uptr)
+(define-collection-lambdas vk-command-buffer)
 
 (define-enum-ftype vk-command-buffer-level
   vk-command-buffer-level-primary
@@ -1013,8 +1021,7 @@
 (define-vulkan-struct vk-command-buffer-allocate-info
   ((command-pool . vk-command-pool)
    (level . vk-command-buffer-level)
-   (command-buffer-count . unsigned-32)
-   (queue-index . unsigned-32)))
+   (command-buffer-count . unsigned-32)))
 
 (define-vulkan-command vkAllocateCommandBuffers
   ((& vk-device) (* vk-command-buffer-allocate-info) (* vk-command-buffer)))
@@ -1051,13 +1058,18 @@
     (syntax-case stx ()
       ((_ scheme-cmd) #'(define-render-pass-command scheme-cmd ()))
       ((_ scheme-cmd (args ...))
-       (with-syntax ((c-command (datum->syntax #'scheme-cmd
-				  (kebab-case->camel-case
-				   (symbol->string (syntax->datum #'scheme-cmd))))))
+       (with-syntax ((c-command
+		      (datum->syntax #'scheme-cmd
+				     (kebab-case->camel-case
+				      (symbol->string (syntax->datum #'scheme-cmd))))))
 	 #'(define scheme-cmd
 	     (foreign-procedure c-command
 				((& vk-command-buffer) args ...)
 				void)))))))
+
+
+(define-ftype vk-descriptor-set uptr)
+(define-collection-lambdas vk-descriptor-set)
 
 ;; render pass commands
 
@@ -1089,6 +1101,29 @@
 (define-render-pass-command vk-cmd-copy-buffer
   ((& vk-buffer) (& vk-buffer) u32 (* vk-buffer-copy)))
 
+(define-ftype vk-clear-color-value
+  (union (float32 (array 4 single-float))
+	 (int32 (array 4 integer-32))
+	 (uint32 (array 4 u32))))
+
+(define make-vk-clear-color-value
+  (lambda (values)
+    (let ((ptr (make-foreign-object vk-clear-color-value)))
+      (for-each (lambda (v)
+		  (ftype-set! vk-clear-color-value (float32 0) ptr v)
+		  (ftype-set! vk-clear-color-value (float32 1) ptr v)
+		  (ftype-set! vk-clear-color-value (float32 2) ptr v)
+		  (ftype-set! vk-clear-color-value (float32 3) ptr v))
+		values)
+      ptr)))
+
+(define-foreign-struct vk-clear-depth-stencil-value
+  ((depth . float)
+   (stencil . u32)))
+
+(define-ftype vk-clear-value
+  (union (color vk-clear-color-value)
+	 (depth-stencil vk-clear-depth-stencil-value)))
 
 ;; ftypes to submit command buffer to queue
 
@@ -1129,8 +1164,7 @@
   ((& vk-device) (* vk-descriptor-pool-create-info) uptr (* vk-descriptor-pool)))
 
 ;; descriptor sets
-(define-ftype vk-descriptor-set uptr)
-(define-collection-lambdas vk-descriptor-set)
+
 
 (define-vulkan-struct vk-descriptor-set-allocate-info
   ((descriptor-pool . vk-descriptor-pool)

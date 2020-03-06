@@ -243,13 +243,13 @@
 	  (transition-image-layout device
 				   command-pool
 				   graphics-queue
-				   supported-format
+				   (image-properties-format property)
 				   image-handle
 				   vk-image-layout-undefined
 				   vk-image-layout-depth-stencil-attachment-optimal)
 	  (make-gpu-image image-handle
 			  memory
-			  (create-image-view device image-handle depth-property)))))
+			  (create-image-view device image-handle property)))))
     
     (let* ((extent (swapchain-extent swapchain))
 	   (supported-format
