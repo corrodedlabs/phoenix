@@ -40,12 +40,6 @@
 				vk-format-d32-sfloat-s8-uint
 				vk-format-d24-unorm-s8-uint))
 
-(define supported-format
-  (find-supported-formats physical-device
-			  candidate-formats
-			  vk-image-tiling-optimal
-			  vk-format-feature-depth-stencil-attachment-bit))
-
 ;; Image Properties required to create a image
 (define-record-type image-properties
   (fields width height format usage-flags aspect-flags))
@@ -161,6 +155,7 @@
     (or (equal? format vk-format-d32-sfloat-s8-uint)
        (equal? format vk-format-d24-unorm-s8-uint))))
 
+;; generic function to handle image transitions
 (define transition-image-layout
   (lambda (device command-pool graphics-queue format image-handle old-layout new-layout)
     (match (layout-transition->barrier-info old-layout new-layout)
@@ -211,6 +206,63 @@
       
       (else (error "could not transition to " new-layout)))))
 
+;; image view
+
+(define create-image-view
+  (lambda (device image-handle image-property)
+    (match image-property
+      ((@ image-properties (format f) (aspect-flags aspect))
+       (let* ((component-mapping (make-vk-component-mapping vk-component-swizzle-identity
+							    vk-component-swizzle-identity
+							    vk-component-swizzle-identity
+							    vk-component-swizzle-identity))
+	      (subresource-range (make-vk-image-subresource-range aspect 0 1 0 1))
+	      (info (make-vk-image-view-create-info image-view-create-info
+						    0
+						    0
+						    (pointer-ref-value image-handle)
+						    vk-image-view-type-2d
+						    f
+						    component-mapping
+						    subresource-range))
+	      (image-view (make-foreign-object vk-image-view)))
+	 (vk-create-image-view device info 0 image-view)
+	 image-view)))))
+
+;; record to represent an image in a gpu
+(define-record-type gpu-image (fields handle view memory))
+
+(define create-depth-buffer-image
+  (lambda (physical-device device command-pool graphics-queue swapchain)
+
+    (define create-gpu-image
+      (lambda (property)
+	(let* ((image-handle (create-image-handle device property))
+	       (memory (allocate-image-memory physical-device device image-handle)))
+	  (bind-image-memory device image-handle memory)
+	  (transition-image-layout device
+				   command-pool
+				   graphics-queue
+				   supported-format
+				   image-handle
+				   vk-image-layout-undefined
+				   vk-image-layout-depth-stencil-attachment-optimal)
+	  (make-gpu-image image-handle
+			  memory
+			  (create-image-view device image-handle depth-property)))))
+    
+    (let* ((extent (swapchain-extent swapchain))
+	   (supported-format
+	    (find-supported-formats physical-device
+				    candidate-formats
+				    vk-image-tiling-optimal
+				    vk-format-feature-depth-stencil-attachment-bit))
+	   (depth-property (create-depth-property extent supported-format)))
+      (create-gpu-image depth-property))))
+
+#!eof
+;; Sample usage
+
 (define extent (swapchain-extent swapchain))
 
 (define depth-property (create-depth-property extent supported-format))
@@ -231,3 +283,5 @@
 			 depth-image-handle
 			 vk-image-layout-undefined
 			 vk-image-layout-depth-stencil-attachment-optimal)
+
+(create-image-view device depth-image-handle depth-property)

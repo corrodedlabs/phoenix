@@ -343,6 +343,9 @@
 
 ;; Depth buffering
 
+(define depth-buffer-image
+  (create-depth-buffer-image physical-device device command-pool graphics-queue swapchain))
+
 
 
 ;; Sample usage
