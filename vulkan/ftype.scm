@@ -435,6 +435,40 @@
    (base-array-layer . unsigned-32)
    (layer-count . unsigned-32)))
 
+
+;; images
+(define-ftype vk-image uptr)
+
+(define-enum-ftype vk-image-type
+  (vk-image-type-1d  0)
+  (vk-image-type-2d  1)
+  (vk-image-type-3d  2))
+
+(define-enum-ftype vk-image-tiling
+  (vk-image-tiling-optimal  0)
+  (vk-image-tiling-linear  1)
+  (vk-image-tiling-drm-format-modifier-ext  1000158000))
+
+(define-vulkan-struct vk-image-create-info
+  ((flags . flags)
+   (image-type . vk-image-type)
+   (format . vk-format)
+   (extent . vk-extent-3d)
+   (mip-levels . u32)
+   (array-layers . u32)
+   (samples . vk-sample-count-flag-bits)
+   (tiling . vk-image-tiling)
+   (usage . flags)
+   (sharing-mode . vk-sharing-mode)
+   (queue-family-index-count . u32)
+   (queue-family-indices . (* u32))
+   (initial-layout . vk-image-layout)))
+
+(define-vulkan-command vkCreateImage
+  ((& vk-device) (* vk-image-create-info) uptr (* vk-image)))
+
+;; image view
+
 (define-vulkan-struct vk-image-view-create-info
   ((flags . flags)
    (image . vk-image)
@@ -604,15 +638,6 @@
    (line-width . float)))
 
 ;; multisampling
-
-(define-enum-ftype vk-sample-count-flag-bits
-  (vk-sample-count-1-bit  #x00000001)
-  (vk-sample-count-2-bit  #x00000002)
-  (vk-sample-count-4-bit  #x00000004)
-  (vk-sample-count-8-bit  #x00000008)
-  (vk-sample-count-16-bit  #x00000010)
-  (vk-sample-count-32-bit  #x00000020)
-  (vk-sample-count-64-bit  #x00000040))
 
 (define-vulkan-struct vk-pipeline-multisample-state-create-info
   ((flags . flags)
@@ -1115,6 +1140,18 @@
 
 (define-vulkan-command vkUpdateDescriptorSets
   ((& vk-device) u32 (* vk-write-descriptor-set) u32 uptr))
+
+;; depth buffering
+
+(define-foreign-struct vk-format-properties
+  ((linear-tiling-features . flags)
+   (optimal-tiling-features . flags)
+   (buffer-features . flags)))
+
+(define vk-get-physical-device-format-properties
+  (foreign-procedure "vkGetPhysicalDeviceFormatProperties"
+		     ((& vk-physical-device) vk-format (* vk-format-properties))
+		     void))
 
 
 

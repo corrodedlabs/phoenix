@@ -558,3 +558,43 @@
   (vk-descriptor-type-input-attachment  10)
   (vk-descriptor-type-inline-uniform-block-ext  1000138000)
   (vk-descriptor-type-acceleration-structure-nv  1000165000))
+
+(define-enum-ftype vk-format-feature-flag-bits
+  (vk-format-feature-sampled-image-bit  #x00000001)
+  (vk-format-feature-storage-image-bit  #x00000002)
+  (vk-format-feature-storage-image-atomic-bit  #x00000004)
+  (vk-format-feature-uniform-texel-buffer-bit  #x00000008)
+  (vk-format-feature-storage-texel-buffer-bit  #x00000010)
+  (vk-format-feature-storage-texel-buffer-atomic-bit  #x00000020)
+  (vk-format-feature-vertex-buffer-bit  #x00000040)
+  (vk-format-feature-color-attachment-bit  #x00000080)
+  (vk-format-feature-color-attachment-blend-bit  #x00000100)
+  (vk-format-feature-depth-stencil-attachment-bit  #x00000200)
+  (vk-format-feature-blit-src-bit  #x00000400)
+  (vk-format-feature-blit-dst-bit  #x00000800)
+  (vk-format-feature-sampled-image-filter-linear-bit  #x00001000)
+  (vk-format-feature-transfer-src-bit  #x00004000)
+  (vk-format-feature-transfer-dst-bit  #x00008000)
+  (vk-format-feature-midpoint-chroma-samples-bit  #x00020000)
+  (vk-format-feature-sampled-image-ycbcr-conversion-linear-filter-bit  #x00040000)
+  (vk-format-feature-sampled-image-ycbcr-conversion-separate-reconstruction-filter-bit
+   #x00080000)
+  (vk-format-feature-sampled-image-ycbcr-conversion-chroma-reconstruction-explicit-bit
+   #x00100000)
+  (vk-format-feature-sampled-image-ycbcr-conversion-chroma-reconstruction-explicit-forceable-bit
+   #x00200000)
+  (vk-format-feature-disjoint-bit  #x00400000)
+  (vk-format-feature-cosited-chroma-samples-bit  #x00800000)
+  (vk-format-feature-sampled-image-filter-cubic-bit-img  #x00002000)
+  (vk-format-feature-sampled-image-filter-minmax-bit-ext  #x00010000)
+  (vk-format-feature-fragment-density-map-bit-ext  #x01000000))
+
+
+(define-enum-ftype vk-sample-count-flag-bits
+  (vk-sample-count-1-bit  #x00000001)
+  (vk-sample-count-2-bit  #x00000002)
+  (vk-sample-count-4-bit  #x00000004)
+  (vk-sample-count-8-bit  #x00000008)
+  (vk-sample-count-16-bit  #x00000010)
+  (vk-sample-count-32-bit  #x00000020)
+  (vk-sample-count-64-bit  #x00000040))
