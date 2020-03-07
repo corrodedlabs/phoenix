@@ -10,9 +10,11 @@
 
 (define-ftype uint32-t unsigned-32)
 (define-ftype u32 unsigned-32)
+(define-ftype u64 unsigned-64)
 (define-ftype flags uint32-t)
 
 (define-collection-lambdas u32)
+(define-collection-lambdas u64)
 (define-collection-lambdas float)
 
 (define-ftype vk-bool32 unsigned-32)
@@ -899,6 +901,7 @@
 ;; buffers
 
 (define-ftype vk-buffer uptr)
+(define-collection-lambdas vk-buffer)
 
 (define-ftype vk-device-size unsigned-64)
 
@@ -1052,6 +1055,8 @@
   (vk-index-type-none-nv 1000165000)
   (vk-index-type-uint8-ext 1000265000))
 
+
+
 ;; macro to help define render pass commands
 (define-syntax define-render-pass-command
   (lambda (stx)
@@ -1071,36 +1076,9 @@
 (define-ftype vk-descriptor-set uptr)
 (define-collection-lambdas vk-descriptor-set)
 
-;; render pass commands
+;; render pass begin info
 
-(define-render-pass-command vk-cmd-bind-pipeline (vk-pipeline-bind-point (& vk-pipeline)))
-
-(define-render-pass-command vk-cmd-bind-vertex-buffers
-  (unsigned-32 unsigned-32 (* vk-buffer) (* vk-device-size)))
-
-(define-render-pass-command vk-cmd-bind-index-buffer
-  (vk-buffer vk-device-size vk-index-type))
-
-(define-render-pass-command vk-cmd-bind-descriptor-sets
-  (vk-pipeline-bind-point vk-pipeline-layout unsigned-32 unsigned-32
-			  (* vk-descriptor-set) unsigned-32 (* unsigned-32)))
-
-(define-render-pass-command vk-cmd-pipeline-barrier
-  (flags flags flags u32 uptr u32 uptr u32 (* vk-image-memory-barrier)))
-
-(define-render-pass-command vk-cmd-draw-indexed
-  (unsigned-32 unsigned-32 unsigned-32 int unsigned-32))
-
-(define-render-pass-command vk-cmd-end-render-pass)
-
-(define-foreign-struct vk-buffer-copy
-  ((src-offset . vk-device-size)
-   (dst-offset . vk-device-size)
-   (size . vk-device-size)))
-
-(define-render-pass-command vk-cmd-copy-buffer
-  ((& vk-buffer) (& vk-buffer) u32 (* vk-buffer-copy)))
-
+;; clear values
 (define-ftype vk-clear-color-value
   (union (float32 (array 4 single-float))
 	 (int32 (array 4 integer-32))
@@ -1124,6 +1102,113 @@
 (define-ftype vk-clear-value
   (union (color vk-clear-color-value)
 	 (depth-stencil vk-clear-depth-stencil-value)))
+
+(define-collection-lambdas vk-clear-value)
+
+(define make-vk-clear-value
+  (lambda (clear-values)
+    (let ((clear-value-ptr (make-foreign-object vk-clear-value)))
+      (exclusive-cond
+       ((list? clear-values)
+	(for-each
+	 (lambda (v)
+	   (ftype-set! vk-clear-value (color float32 0) clear-value-ptr v)
+	   (ftype-set! vk-clear-value (color float32 1) clear-value-ptr v)
+	   (ftype-set! vk-clear-value (color float32 2) clear-value-ptr v)
+	   (ftype-set! vk-clear-value (color float32 3) clear-value-ptr v))
+	 clear-values))
+       ((pair? clear-values)
+	(ftype-set! vk-clear-value
+		    (depth-stencil depth)
+		    clear-value-ptr
+		    (car clear-values))
+	(ftype-set! vk-clear-value
+		    (depth-stencil stencil)
+		    clear-value-ptr
+		    (cdr clear-values))))
+      clear-value-ptr)))
+
+
+(define-ftype vk-render-pass-begin-info
+  (struct (s-type vk-structure-type)
+	  (p-next uptr)
+	  (render-pass vk-render-pass)
+	  (framebuffer vk-frame-buffer)
+	  (render-area vk-rect-2d)
+	  (clear-value-count u32)
+	  (clear-values (* vk-clear-value))))
+
+;; offset cons cell (x . y)
+;; extent cons cell (width . height)
+(define-record-type render-area (fields offset extent))
+
+(define make-vk-render-pass-begin-info
+  (lambda (render-pass framebuffer render-area clear-values)
+    (match render-area
+      (($ render-area offset extent)
+       (let ((info (make-foreign-object vk-render-pass-begin-info)))
+	 (ftype-set! vk-render-pass-begin-info (s-type) info render-pass-begin-info)
+	 (ftype-set! vk-render-pass-begin-info (p-next) info 0)
+	 (ftype-set! vk-render-pass-begin-info
+		     (render-pass)
+		     info
+		     (pointer-ref-value render-pass))
+	 (ftype-set! vk-render-pass-begin-info
+		     (framebuffer)
+		     info
+		     (pointer-ref-value framebuffer))
+	 (ftype-set! vk-render-pass-begin-info (render-area offset x) info (car offset))
+	 (ftype-set! vk-render-pass-begin-info (render-area offset y) info (cdr offset))
+	 (ftype-set! vk-render-pass-begin-info (render-area extent width) info (car extent))
+	 (ftype-set! vk-render-pass-begin-info (render-area extent height) info (cdr extent))
+	 (ftype-set! vk-render-pass-begin-info
+		     (clear-value-count)
+		     info
+		     (array-pointer-length clear-values))
+	 (ftype-set! vk-render-pass-begin-info
+		     (clear-values)
+		     info
+		     (array-pointer-raw-ptr clear-values))
+	 info)))))
+
+
+(define-enum-ftype vk-subpass-contents
+  (vk-subpass-contents-inline  0)
+  (vk-subpass-contents-secondary-command-buffers  1))
+
+;; render pass commands
+
+(define-render-pass-command vk-cmd-bind-pipeline (vk-pipeline-bind-point (& vk-pipeline)))
+
+(define-render-pass-command vk-cmd-bind-vertex-buffers
+  (unsigned-32 unsigned-32 (* vk-buffer) (* vk-device-size)))
+
+(define-render-pass-command vk-cmd-bind-index-buffer
+  ((& vk-buffer) vk-device-size vk-index-type))
+
+(define-render-pass-command vk-cmd-bind-descriptor-sets
+  (vk-pipeline-bind-point (& vk-pipeline-layout) unsigned-32 unsigned-32
+			  (* vk-descriptor-set) unsigned-32 (* unsigned-32)))
+
+(define-render-pass-command vk-cmd-pipeline-barrier
+  (flags flags flags u32 uptr u32 uptr u32 (* vk-image-memory-barrier)))
+
+(define-render-pass-command vk-cmd-draw-indexed
+  (unsigned-32 unsigned-32 unsigned-32 int unsigned-32))
+
+(define-render-pass-command vk-cmd-begin-render-pass
+  ((* vk-render-pass-begin-info) vk-subpass-contents))
+
+(define-render-pass-command vk-cmd-end-render-pass)
+
+(define-foreign-struct vk-buffer-copy
+  ((src-offset . vk-device-size)
+   (dst-offset . vk-device-size)
+   (size . vk-device-size)))
+
+(define-render-pass-command vk-cmd-copy-buffer
+  ((& vk-buffer) (& vk-buffer) u32 (* vk-buffer-copy)))
+
 
 ;; ftypes to submit command buffer to queue
 

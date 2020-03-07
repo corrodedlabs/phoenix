@@ -1,8 +1,6 @@
 
 ;; Framebuffers
 
-(define image-views (swapchain-image-views swapchain-details))
-
 ;; returns a list of framebuffers created for each of the swapchain image views
 (define create-framebuffers
   (lambda (device swapchain pipeline)
@@ -34,9 +32,6 @@
       (vk-create-command-pool device info 0 command-pool)
       command-pool)))
 
-(define device (vulkan-state-device vs))
-(define queue-index (vulkan-state-queue-index vs))
-(define command-pool (create-command-pool device queue-index))
 
 (define allocate-command-buffers
   (case-lambda
@@ -54,16 +49,18 @@
        command-buffer))))
 
 (define start-command-buffer-recording
-  (lambda (command-buffer one-time-submit?)
-    (let ((begin-info (make-vk-command-buffer-begin-info
-		       command-buffer-begin-info
-		       0
-		       (if one-time-submit?
-			 vk-command-buffer-usage-one-time-submit-bit
-			 0)
-		       (null-pointer vk-command-buffer-inheritance-info))))
-      (vk-begin-command-buffer command-buffer begin-info)
-      command-buffer)))
+  (case-lambda
+    ((command-buffer) (start-command-buffer-recording command-buffer #f))
+    ((command-buffer one-time-submit?)
+     (let ((begin-info (make-vk-command-buffer-begin-info
+			command-buffer-begin-info
+			0
+			(if one-time-submit?
+			    vk-command-buffer-usage-one-time-submit-bit
+			    0)
+			(null-pointer vk-command-buffer-inheritance-info))))
+       (vk-begin-command-buffer command-buffer begin-info)
+       command-buffer))))
 
 (define end-command-buffer-recording
   (case-lambda
@@ -92,8 +89,8 @@
       (dynamic-wind
 	(lambda ()
 	  (set! command-buffer
-	    (start-command-buffer-recording (allocate-command-buffers device command-pool)
-					    #t)))
+		(start-command-buffer-recording (allocate-command-buffers device command-pool)
+						#t)))
 	(lambda ()
 	  (begin (f command-buffer)
 		 (end-command-buffer-recording command-buffer graphics-queue)))
@@ -102,42 +99,94 @@
 	  #f
 	  )))))
 
-;; for test
-(define num-buffers 8)
-
 ;; allocate 'num-buffers' command-buffers and record the command as passed in f
 ;; to all of them
-;; f will also be passed the index of the buffer being recorded
 (define record-command-buffers
-  (lambda (device command-pool framebuffers f)
-    (let* ((command-buffers (allocate-command-buffers device command-pool num-buffers))
+  (lambda (device command-pool framebuffers descriptor-sets f)
+    (let* ((num-buffers (length framebuffers))
+	   (command-buffers (allocate-command-buffers device command-pool num-buffers))
 	   (cmd-buffers-ptr (make-array-pointer num-buffers
 						command-buffers
 						'vk-command-buffer)))
       
-      (map (lambda (cmd-buffer frame-buffer)
+      (map (lambda (cmd-buffer frame-buffer descriptor-set)
 	     (start-command-buffer-recording cmd-buffer)
-	     (f cmd-buffer frame-buffer)
+	     (f cmd-buffer frame-buffer descriptor-set)
 	     (end-command-buffer-recording cmd-buffer))
 	   (vk-command-buffer-pointer-map identity cmd-buffers-ptr)
-	   framebuffers)
-      command-buffers)))
+	   framebuffers
+	   descriptor-sets)
+      cmd-buffers-ptr)))
 
 
-;; (define create-command-buffers
-;;   (lambda (device command-pool pipeline framebuffers)
+(define create-command-buffers
+  (lambda (device swapchain command-pool pipeline framebuffers descriptor-sets)
 
-;;     (define clear-values
-;;       (lambda ()
-;; 	(let ((clear-value (make-vk-clear-color-value clear-values))
-;; 	      (depth-clear (make-vk-clear-depth-stencil-value 1.0 0.0)))
-;; 	  )))
+    (define clear-values-ptr
+      (lambda ()
+	(let ((clear-values clear-values)
+	      (depth-clear (cons 1.0 0)))
+	  (list->vk-clear-value-pointer-array (list (make-vk-clear-value clear-values)
+						    (make-vk-clear-value depth-clear))))))
 
-;;     (record-command-buffers device
-;; 			    command-pool
-;; 			    framebuffers
-;; 			    (lambda (cmd-buffer framebuffer)
-;; 			      ()))))
+    (define perform-render-pass
+      (lambda (cmd-buffer framebuffer descriptor-set vertex-buffer index-buffer render-area clear-values)
+	(let ((info (make-vk-render-pass-begin-info (pipeline-render-pass pipeline)
+						    framebuffer
+						    render-area
+						    clear-values))
+	      (vertex-buffers (array-pointer-raw-ptr (list->vk-buffer-pointer-array
+						      (list (buffer-handle vertex-buffer)))))
+	      (offsets (array-pointer-raw-ptr
+			(list->u64-pointer-array (map (lambda (v)
+							(let ((ptr (make-foreign-object u64)))
+							  (ftype-set! u64 () ptr v)
+							  ptr))
+						      (list 0))))))
+	  (vk-cmd-begin-render-pass cmd-buffer
+				    info
+				    vk-subpass-contents-inline)
+	  (vk-cmd-bind-pipeline cmd-buffer
+				vk-pipeline-bind-point-graphics
+				(pipeline-handle pipeline))
+	  (vk-cmd-bind-vertex-buffers cmd-buffer
+				      0
+				      1
+				      vertex-buffers
+				      offsets)
+	  (vk-cmd-bind-index-buffer cmd-buffer
+				    (buffer-handle index-buffer)
+				    0
+				    vk-index-type-uint32)
+	  (vk-cmd-bind-descriptor-sets cmd-buffer
+				       vk-pipeline-bind-point-graphics
+				       (pipeline-layout pipeline)
+				       0
+				       1
+				       descriptor-set
+				       0
+				       (null-pointer u32))
+	  (vk-cmd-draw-indexed cmd-buffer (length indices) 1 0 0 0)
+	  (vk-cmd-end-render-pass cmd-buffer)
+	  cmd-buffer)))
+
+    (let ((clear-values (clear-values-ptr))
+	  (render-area
+	   (make-render-area (cons 0 0)
+			     (cons (vk-extent-2d-width (swapchain-extent swapchain))
+				   (vk-extent-2d-height (swapchain-extent swapchain))))))
+      (record-command-buffers device
+			      command-pool
+			      framebuffers
+			      descriptor-sets
+			      (lambda (cmd-buffer framebuffer descriptor-set)
+				(perform-render-pass cmd-buffer
+						     framebuffer
+						     descriptor-set
+						     vertex-buffer
+						     index-buffer
+						     render-area
+						     clear-values))))))
 
 ;; Buffers
 
@@ -406,6 +455,11 @@
 
 ;; Sample usage
 
+(define image-views (swapchain-image-views swapchain-details))
+(define device (vulkan-state-device vs))
+(define queue-index (vulkan-state-queue-index vs))
+(define command-pool (create-command-pool device queue-index))
+
 (define size (fold-left + 0 (map vertex-input-total-size vertices)))
 (define buffer-ptr (create-new-buffer device size host-local))
 
@@ -463,6 +517,10 @@
 
 (define clear-values (list 0.0 0.0 0.0 1.0))
 
+
+(define cmd-buffers
+  (create-command-buffers device swapchain command-pool pipeline framebuffers sets))
+
 ;; (define memory (buffer-memory buf))
 ;; (define data-size (buffer-size buf))
 
@@ -478,4 +536,5 @@
 
 (begin (load "vk.scm")
        (load "vulkan/pipeline.scm")
+       (load "vulkan/images.scm")
        (load "vulkan/buffers.scm"))
