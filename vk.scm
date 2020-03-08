@@ -1,3 +1,4 @@
+#!/usr/bin/scheme
 ;; (load "vulkan/instance.scm")
 ;; (load "vulkan/structure-types.scm")
 ;; (load "ffi.scm")
@@ -49,7 +50,10 @@
 			 swapchain-details))))
 
 (define vs (setup-vulkan))
-
+(load "vulkan/pipeline.scm")
+(load "vulkan/images.scm")
+(load "vulkan/buffers.scm")
+(load "vulkan/sync.scm")
 
 #!eof
 

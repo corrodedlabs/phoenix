@@ -1110,13 +1110,10 @@
     (let ((clear-value-ptr (make-foreign-object vk-clear-value)))
       (exclusive-cond
        ((list? clear-values)
-	(for-each
-	 (lambda (v)
-	   (ftype-set! vk-clear-value (color float32 0) clear-value-ptr v)
-	   (ftype-set! vk-clear-value (color float32 1) clear-value-ptr v)
-	   (ftype-set! vk-clear-value (color float32 2) clear-value-ptr v)
-	   (ftype-set! vk-clear-value (color float32 3) clear-value-ptr v))
-	 clear-values))
+	(map (lambda (v i)
+	       (ftype-set! vk-clear-value (color float32 i) clear-value-ptr v))
+	     clear-values
+	     (iota (length clear-values))))
        ((pair? clear-values)
 	(ftype-set! vk-clear-value
 		    (depth-stencil depth)
@@ -1193,6 +1190,8 @@
 (define-render-pass-command vk-cmd-pipeline-barrier
   (flags flags flags u32 uptr u32 uptr u32 (* vk-image-memory-barrier)))
 
+(define-render-pass-command vk-cmd-draw (u32 u32 u32 u32))
+
 (define-render-pass-command vk-cmd-draw-indexed
   (unsigned-32 unsigned-32 unsigned-32 int unsigned-32))
 
@@ -1224,8 +1223,7 @@
    (signal-semaphore-count . u32)
    (signal-semaphores . (* vk-semaphore))))
 
-(define-vulkan-command vkQueueSubmit
-  ((& vk-queue) u32 (* vk-submit-info) uptr))
+(define-vulkan-command vkQueueSubmit ((& vk-queue) u32 (* vk-submit-info) uptr))
 
 (define-vulkan-command vkQueueWaitIdle ((& vk-queue)))
 
@@ -1298,6 +1296,46 @@
 		     ((& vk-physical-device) vk-format (* vk-format-properties))
 		     void))
 
+;; synchronization utilities
+
+;; semaphores
+
+(define-vulkan-struct vk-semaphore-create-info
+  ((flags . flags)))
+
+(define-vulkan-command vkCreateSemaphore
+  ((& vk-device) (* vk-semaphore-create-info) uptr (* vk-semaphore)))
+
+(define-vulkan-command vkDestroySemaphore ((& vk-device) (& vk-semaphore) uptr))
+
+;; fences
+
+(define-enum-ftype vk-fence-create-flag-bits
+  (vk-fence-create-signaled-bit  #x00000001))
+
+(define-vulkan-struct vk-fence-create-info
+  ((flags . flags)))
+
+(define-vulkan-command vkCreateFence
+  ((& vk-device) (* vk-fence-create-info) uptr (* vk-fence)))
+
+(define-vulkan-command vkDestroyFence ((& vk-device) (& vk-fence) uptr))
+(define-vulkan-command vkResetFences ((& vk-device) u32 (* vk-fence)))
+(define-vulkan-command vkGetFenceStatus ((& vk-device) (& vk-fence)))
+(define-vulkan-command vkWaitForFences ((& vk-device) u32 (* vk-fence) vk-bool32 u64))
+
+(define-vulkan-command vkAcquireNextImageKHR
+  ((& vk-device) (& vk-swapchain) u64 (& vk-semaphore) uptr (* u32)))
+
+(define-vulkan-struct vk-present-info
+  ((wait-semaphore-count . u32)
+   (wait-semaphores . (* vk-semaphore))
+   (swapchain-count . u32)
+   (swapchains . (* vk-swapchain))
+   (image-indices . (* u32))
+   (results . (* int))))
+
+(define-vulkan-command vkQueuePresentKHR ((& vk-queue) (* vk-present-info)))
 
 
 #!eof

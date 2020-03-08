@@ -64,20 +64,20 @@
 
 (define end-command-buffer-recording
   (case-lambda
-    ((command-buffer)
-     (vk-end-command-buffer command-buffer))
-    ((command-buffer graphics-queue)
-     (end-command-buffer-recording command-buffer)
-     (let ((submit-info (make-vk-submit-info submit-info 0
-					     0
-					     (null-pointer vk-semaphore)
-					     (null-pointer flags)
-					     1
-					     command-buffer
-					     0
-					     (null-pointer vk-semaphore))))
-       (vk-queue-submit graphics-queue 1 submit-info 0)
-       (vk-queue-wait-idle graphics-queue)))))
+   ((command-buffer)
+    (vk-end-command-buffer command-buffer))
+   ((command-buffer graphics-queue)
+    (end-command-buffer-recording command-buffer)
+    (let ((submit-info (make-vk-submit-info submit-info 0
+					    0
+					    (null-pointer vk-semaphore)
+					    (null-pointer flags)
+					    1
+					    command-buffer
+					    0
+					    (null-pointer vk-semaphore))))
+      (vk-queue-submit graphics-queue 1 submit-info 0)
+      (vk-queue-wait-idle graphics-queue)))))
 
 ;; creates and submits a single command buffer
 ;; the created command buffer is passed to the function f
@@ -109,13 +109,14 @@
 						command-buffers
 						'vk-command-buffer)))
       
-      (map (lambda (cmd-buffer frame-buffer descriptor-set)
+      (map (lambda (cmd-buffer frame-buffer )
 	     (start-command-buffer-recording cmd-buffer)
-	     (f cmd-buffer frame-buffer descriptor-set)
+	     (f cmd-buffer frame-buffer)
 	     (end-command-buffer-recording cmd-buffer))
 	   (vk-command-buffer-pointer-map identity cmd-buffers-ptr)
 	   framebuffers
-	   descriptor-sets)
+	   ;; descriptor-sets
+	   )
       cmd-buffers-ptr)))
 
 
@@ -127,7 +128,8 @@
 	(let ((clear-values clear-values)
 	      (depth-clear (cons 1.0 0)))
 	  (list->vk-clear-value-pointer-array (list (make-vk-clear-value clear-values)
-						    (make-vk-clear-value depth-clear))))))
+						    ;; (make-vk-clear-value depth-clear)
+						    )))))
 
     (define perform-render-pass
       (lambda (cmd-buffer framebuffer descriptor-set vertex-buffer index-buffer render-area clear-values)
@@ -149,24 +151,25 @@
 	  (vk-cmd-bind-pipeline cmd-buffer
 				vk-pipeline-bind-point-graphics
 				(pipeline-handle pipeline))
-	  (vk-cmd-bind-vertex-buffers cmd-buffer
-				      0
-				      1
-				      vertex-buffers
-				      offsets)
-	  (vk-cmd-bind-index-buffer cmd-buffer
-				    (buffer-handle index-buffer)
-				    0
-				    vk-index-type-uint32)
-	  (vk-cmd-bind-descriptor-sets cmd-buffer
-				       vk-pipeline-bind-point-graphics
-				       (pipeline-layout pipeline)
-				       0
-				       1
-				       descriptor-set
-				       0
-				       (null-pointer u32))
-	  (vk-cmd-draw-indexed cmd-buffer (length indices) 1 0 0 0)
+	  ;; (vk-cmd-bind-vertex-buffers cmd-buffer
+	  ;; 			      0
+	  ;; 			      1
+	  ;; 			      vertex-buffers
+	  ;; 			      offsets)
+	  ;; (vk-cmd-bind-index-buffer cmd-buffer
+	  ;; 			    (buffer-handle index-buffer)
+	  ;; 			    0
+	  ;; 			    vk-index-type-uint32)
+	  ;; (vk-cmd-bind-descriptor-sets cmd-buffer
+	  ;; 			       vk-pipeline-bind-point-graphics
+	  ;; 			       (pipeline-layout pipeline)
+	  ;; 			       0
+	  ;; 			       1
+	  ;; 			       descriptor-set
+	  ;; 			       0
+	  ;; 			       (null-pointer u32))
+	  ;; (vk-cmd-draw-indexed cmd-buffer (length indices) 1 0 0 0)
+	  (vk-cmd-draw cmd-buffer 3 1 0 0)
 	  (vk-cmd-end-render-pass cmd-buffer)
 	  cmd-buffer)))
 
@@ -179,10 +182,10 @@
 			      command-pool
 			      framebuffers
 			      descriptor-sets
-			      (lambda (cmd-buffer framebuffer descriptor-set)
+			      (lambda (cmd-buffer framebuffer )
 				(perform-render-pass cmd-buffer
 						     framebuffer
-						     descriptor-set
+						     #f
 						     vertex-buffer
 						     index-buffer
 						     render-area
@@ -471,6 +474,7 @@
 ;; (define buf (create-host-buffer physical-device device vertices))
 
 (define graphics-queue (car (vulkan-state-queues vs)))
+(define present-queue (cdr (vulkan-state-queues vs)))
 (define vertex-buffer (create-gpu-local-buffer physical-device
 					       device
 					       graphics-queue
@@ -499,18 +503,18 @@
 			  uniform-buffer-data-list
 			  (length framebuffers)))
 
-(define descriptor-count (length uniform-buffers))
+;; (define descriptor-count (length uniform-buffers))
 
-(define descriptor-pool (create-descriptor-pool device
-						(length uniform-buffers)))
+;; (define descriptor-pool (create-descriptor-pool device
+;; 						(length uniform-buffers)))
 
-(define descriptor-layout (pipeline-descriptor-set-layout pipeline))
+;; (define descriptor-layout (pipeline-descriptor-set-layout pipeline))
 (define num-sets (length uniform-buffers))
 
-(define sets (create-descriptor-sets device
-				     descriptor-pool
-				     descriptor-layout
-				     uniform-buffers))
+;; (define sets (create-descriptor-sets device
+;; 				     descriptor-pool
+;; 				     descriptor-layout
+;; 				     uniform-buffers))
 
 (define depth-buffer-image
   (create-depth-buffer-image physical-device device command-pool graphics-queue swapchain))
@@ -519,7 +523,7 @@
 
 
 (define cmd-buffers
-  (create-command-buffers device swapchain command-pool pipeline framebuffers sets))
+  (create-command-buffers device swapchain command-pool pipeline framebuffers #f))
 
 ;; (define memory (buffer-memory buf))
 ;; (define data-size (buffer-size buf))
@@ -537,4 +541,5 @@
 (begin (load "vk.scm")
        (load "vulkan/pipeline.scm")
        (load "vulkan/images.scm")
-       (load "vulkan/buffers.scm"))
+       (load "vulkan/buffers.scm")
+       (load "vulkan/sync.scm"))

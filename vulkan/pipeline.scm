@@ -128,10 +128,17 @@
     (make-vk-pipeline-vertex-input-state-create-info pipeline-vertex-input-state-create-info
 						     0
 						     0
-						     1
-						     (make-vertex-binding-description)
-						     (length attrs)
-						     (make-attribute-descriptions))))
+						     0
+						     (null-pointer
+						      vk-vertex-input-binding-description)
+						     0
+						     (null-pointer
+						      vk-vertex-input-attribute-description)
+						     ;; 1
+						     ;; (make-vertex-binding-description)
+						     ;; (length attrs)
+						     ;; (make-attribute-descriptions)
+						     )))
 
 
 ;; input assembly
@@ -174,7 +181,7 @@
 						    vk-false
 						    vk-polygon-mode-fill
 						    vk-cull-mode-back-bit
-						    vk-front-face-counter-clockwise
+						    vk-front-face-clockwise
 						    vk-false
 						    0.0
 						    0.0
@@ -243,8 +250,8 @@
   (let* ((descriptor-layout (create-descriptor-layout device))
 	 (layout-info
 	  (make-vk-pipeline-layout-create-info pipeline-layout-create-info 0 0
-					       1
-					       descriptor-layout
+					       0
+					       (null-pointer vk-descriptor-set-layout)
 					       0
 					       (null-pointer vk-push-constant-range)))
 	 (layout (make-foreign-object vk-pipeline-layout)))
@@ -398,11 +405,12 @@
 (define device (vulkan-state-device vs))
 (define swapchain-details (vulkan-state-swapchain vs))
 
-(define vertices (list (make-vertex-input '#2( 0.0 -0.5) '#3(1.0 0.0 0.0))
-		       (make-vertex-input '#2( 0.5  0.5) '#3(0.0 1.0 0.0))
-		       (make-vertex-input '#2(-0.5  0.5) '#3(0.0 0.0 1.0))))
+(define vertices (list (make-vertex-input '#2( -0.5 -0.5) '#3(1.0 0.0 0.0))
+		       (make-vertex-input '#2( 0.5  -0.5) '#3(0.0 1.0 0.0))
+		       (make-vertex-input '#2( 0.5   0.5) '#3(0.0 0.0 1.0))
+		       (make-vertex-input '#2(-0.5   0.5) '#3(1.0 1.0 1.0))))
 
-(define indices (list 0 1 2 2 3 0 4 5 6 6 7 4))
+(define indices (list 0 1 2 2 3 0))
 
 (define stride 4)
 
