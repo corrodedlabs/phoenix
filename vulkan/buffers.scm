@@ -541,5 +541,4 @@
 (begin (load "vk.scm")
        (load "vulkan/pipeline.scm")
        (load "vulkan/images.scm")
-       (load "vulkan/buffers.scm")
-       (load "vulkan/sync.scm"))
+       (load "vulkan/buffers.scm"))

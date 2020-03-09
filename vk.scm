@@ -55,6 +55,9 @@
 (load "vulkan/buffers.scm")
 (load "vulkan/sync.scm")
 
+
+(start-loop)
+
 #!eof
 
 > (load "vk.scm")
