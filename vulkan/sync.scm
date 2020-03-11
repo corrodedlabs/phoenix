@@ -1,5 +1,7 @@
 ;; Synchronization utilities for the gpu
 
+(define *debug* #f)
+
 ;; Also contains code to render the command buffers
 
 (define +frames-in-flight+ 2)
@@ -45,12 +47,14 @@
 
 (define draw-next-frame
   (lambda (device swapchain cmd-buffers sync-objects state)
+    (display "starting draw loop") (newline)
     (let ((image-index (make-foreign-object u32))
 	  (cmd-buffers-arr (vk-command-buffer-pointer-map identity cmd-buffers))
 	  (swapchain-handle (swapchain-handle swapchain)))
       (let lp ((state state)
 	       (i 0))
 	(cond
+	 ((and *debug* (fx= i 300)) state)
 	 (*run-draw-loop*
 	  (match state
 	    (($ frame-state current-frame images-in-flight)
@@ -103,12 +107,18 @@
 		    (list->vector (map (lambda (_) #f)
 				       (iota (array-pointer-length cmd-buffers))))))
 
+
+(define run (lambda ()
+	      (draw-next-frame device swapchain cmd-buffers sync-objects initial-state)))
+
 (define start-loop
-  (lambda ()
+  (case-lambda
+   (() (start-loop #f))
+   ((threaded?)
     (set! *run-draw-loop* #t)
-    (fork-thread
-     (lambda ()
-       (draw-next-frame device swapchain cmd-buffers sync-objects initial-state)))))
+    (if threaded?
+	(fork-thread run)
+	(run)))))
 
 
 (define stop-loop

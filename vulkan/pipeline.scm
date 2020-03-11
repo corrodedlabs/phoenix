@@ -92,8 +92,8 @@
 (define vector->attr
   (lambda (v)
     (case (vector-length v)
-      ((2) (cons vk-format-r32g32-sfloat 8))
-      ((3) (cons vk-format-r32g32b32-sfloat 12))
+      ((2) (cons vk-format-r32g32-sfloat 0))
+      ((3) (cons vk-format-r32g32b32-sfloat 8))
       (else (error "unsupported vector" v)))))
 
 (define vertex-input->attrs
@@ -115,10 +115,11 @@
 
     (define make-attribute-descriptions
       (lambda ()
+	(displayln "attrs is " attrs)
 	(array-pointer-raw-ptr
 	 (list->vk-vertex-input-attribute-description-pointer-array
 	  (map-indexed (lambda (attr i)
-			 (displayln "attr" attr)
+			 (displayln "attr" i)
 			 (make-vk-vertex-input-attribute-description i
 								     0
 								     (car attr)
@@ -128,17 +129,10 @@
     (make-vk-pipeline-vertex-input-state-create-info pipeline-vertex-input-state-create-info
 						     0
 						     0
-						     0
-						     (null-pointer
-						      vk-vertex-input-binding-description)
-						     0
-						     (null-pointer
-						      vk-vertex-input-attribute-description)
-						     ;; 1
-						     ;; (make-vertex-binding-description)
-						     ;; (length attrs)
-						     ;; (make-attribute-descriptions)
-						     )))
+						     1
+						     (make-vertex-binding-description)
+						     (length attrs)
+						     (make-attribute-descriptions))))
 
 
 ;; input assembly
@@ -281,10 +275,10 @@
 	       (color-attachment
 		(make-vk-attachment-description 0
 						swapchain-image-format
-						vk-sample-count-1-bit
-						vk-attachment-load-op-clear
-						vk-attachment-store-op-store
-						vk-attachment-load-dont-care
+						vk-sample-count-1-bit ;; samples
+						vk-attachment-load-op-clear ;; load-op
+						vk-attachment-store-op-store ;; store-op
+						vk-attachment-load-dont-care ;;stencil-load-op
 						vk-attachment-store-dont-care
 						vk-image-layout-undefined
 						vk-image-layout-present-src-khr))
@@ -412,7 +406,7 @@
 
 (define indices (list 0 1 2 2 3 0))
 
-(define stride 4)
+(define stride 20)
 
 (define shaders (make-shaders "shaders/shader.vert" "shaders/shader.frag"))
 
@@ -422,7 +416,8 @@
 						 stride
 						 (vertex-input->attrs (car vertices)))))
 
-(define pipeline (create-graphics-pipeline device swapchain-details pipeline-data))
+(define pipeline
+  (create-graphics-pipeline device swapchain-details pipeline-data))
 #!eof
 
 =========================================================================================

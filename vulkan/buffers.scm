@@ -151,15 +151,15 @@
 	  (vk-cmd-bind-pipeline cmd-buffer
 				vk-pipeline-bind-point-graphics
 				(pipeline-handle pipeline))
-	  ;; (vk-cmd-bind-vertex-buffers cmd-buffer
-	  ;; 			      0
-	  ;; 			      1
-	  ;; 			      vertex-buffers
-	  ;; 			      offsets)
-	  ;; (vk-cmd-bind-index-buffer cmd-buffer
-	  ;; 			    (buffer-handle index-buffer)
-	  ;; 			    0
-	  ;; 			    vk-index-type-uint32)
+	  (vk-cmd-bind-vertex-buffers cmd-buffer
+	  			      0
+	  			      1
+	  			      (buffer-handle vertex-buffer)
+	  			      offsets)
+	  (vk-cmd-bind-index-buffer cmd-buffer
+	  			    (buffer-handle index-buffer)
+	  			    0
+	  			    vk-index-type-uint32)
 	  ;; (vk-cmd-bind-descriptor-sets cmd-buffer
 	  ;; 			       vk-pipeline-bind-point-graphics
 	  ;; 			       (pipeline-layout pipeline)
@@ -168,8 +168,7 @@
 	  ;; 			       descriptor-set
 	  ;; 			       0
 	  ;; 			       (null-pointer u32))
-	  ;; (vk-cmd-draw-indexed cmd-buffer (length indices) 1 0 0 0)
-	  (vk-cmd-draw cmd-buffer 3 1 0 0)
+	  (vk-cmd-draw-indexed cmd-buffer (length indices) 1 0 0 0)
 	  (vk-cmd-end-render-pass cmd-buffer)
 	  cmd-buffer)))
 
@@ -287,43 +286,48 @@
      ((vertex-input? (car data)) (sizeof-vertex-input-arr data))
      ((number? (car data)) (* 4 (length data))))))
 
+
+
 ;; copy data from cpu to gpu host local memory
 (define copy-data
   (lambda (device memory data)
+    
     (let ((data-ptr (make-foreign-object uptr))
 
 	  (size (data-size data)))
       (vk-map-memory device memory 0 size 0 (ftype-pointer-address data-ptr))
       (displayln "size if " size)
-      (memcpy (ftype-pointer-address data-ptr)
+      (memcpy (pointer-ref-value data-ptr)
 	      (ftype-pointer-address
 	       (array-pointer-raw-ptr
 		(cond
 		 ((vertex-input? (car data))
 		  (list->float-pointer-array
-		   (map (lambda (value)
-			  (let ((ptr (make-foreign-object float)))
-			    (ftype-set! float () ptr value)
-			    ptr)) 
-			(vertices->list data))))
+		   (map-indexed (lambda (value i)
+				  (displayln "setting value" value)
+				  (let ((ptr (make-foreign-object float)))
+				    (ftype-set! float () ptr value)
+				    ptr)) 
+				(vertices->list data))))
 
 		 ((inexact? (car data))
 		  (list->float-pointer-array
-		   (map (lambda (value)
-			  (let ((ptr (make-foreign-object float)))
-			    (ftype-set! float () ptr value)
-			    ptr))
-			data)))
+		   (map-indexed (lambda (value i)
+				  (let ((ptr (make-foreign-object float)))
+				    (ftype-set! float () ptr value)
+				    ptr))
+				data)))
 
 		 ((number? (car data))
 		  (list->u32-pointer-array
-		   (map (lambda (value)
-			  (displayln "setting value" value)
-			  (let ((ptr (make-foreign-object u32)))
-			    (ftype-set! u32 () ptr value)
-			    ptr)) 
-			data))))))
+		   (map-indexed (lambda (value i)
+				  (displayln "setting value" value)
+				  (let ((ptr (make-foreign-object u32)))
+				    (ftype-set! u32 () ptr value)
+				    ptr)) 
+				data))))))
 	      size)
+      (displayln "ftype" (ftype-pointer->sexpr data-ptr))
       (vk-unmap-memory device memory))))
 
 
@@ -475,11 +479,16 @@
 
 (define graphics-queue (car (vulkan-state-queues vs)))
 (define present-queue (cdr (vulkan-state-queues vs)))
+
+(display "creating buffers") (newline)
+
 (define vertex-buffer (create-gpu-local-buffer physical-device
 					       device
 					       graphics-queue
 					       vertices
 					       vk-buffer-usage-vertex-buffer-bit))
+
+(displayln "vertex buffer done" vertex-buffer)
 
 (define index-buffer (create-gpu-local-buffer physical-device
 					      device
@@ -487,21 +496,24 @@
 					      indices
 					      vk-buffer-usage-index-buffer-bit))
 
+(displayln "index buffer created" index-buffer)
 
 (define image-view (car image-views))
-(define framebuffers (create-framebuffers device swapchain-details pipeline))
-(define swapchain (vulkan-state-swapchain vs))
 
+(define framebuffers (create-framebuffers device swapchain-details pipeline))
+(displayln "framebuffers created " framebuffers)
+
+(define swapchain (vulkan-state-swapchain vs))
 (define extent (swapchain-extent (vulkan-state-swapchain vs)))
 
-(define uniform-buffer-data-list
-  (uniform-buffer-data->list (extent->uniform-buffer-data extent)))
+;; (define uniform-buffer-data-list
+;;   (uniform-buffer-data->list (extent->uniform-buffer-data extent)))
 
-(define uniform-buffers
-  (create-uniform-buffers physical-device
-			  device
-			  uniform-buffer-data-list
-			  (length framebuffers)))
+;; (define uniform-buffers
+;;   (create-uniform-buffers physical-device
+;; 			  device
+;; 			  uniform-buffer-data-list
+;; 			  (length framebuffers)))
 
 ;; (define descriptor-count (length uniform-buffers))
 
@@ -509,21 +521,24 @@
 ;; 						(length uniform-buffers)))
 
 ;; (define descriptor-layout (pipeline-descriptor-set-layout pipeline))
-(define num-sets (length uniform-buffers))
+;; (define num-sets (length uniform-buffers))
 
 ;; (define sets (create-descriptor-sets device
 ;; 				     descriptor-pool
 ;; 				     descriptor-layout
 ;; 				     uniform-buffers))
 
-(define depth-buffer-image
-  (create-depth-buffer-image physical-device device command-pool graphics-queue swapchain))
+;; (define depth-buffer-image
+;;   (create-depth-buffer-image physical-device device command-pool graphics-queue swapchain))
 
 (define clear-values (list 0.0 0.0 0.0 1.0))
 
+(display "going to created cmd buffers") (newline)
 
 (define cmd-buffers
   (create-command-buffers device swapchain command-pool pipeline framebuffers #f))
+
+(displayln "command buffers created" cmd-buffers)
 
 ;; (define memory (buffer-memory buf))
 ;; (define data-size (buffer-size buf))

@@ -10,6 +10,7 @@
 	(ffi)
 	(glfw)
 	(shaderc)
+	;; (renderdoc)
 
 	(srfi s43 vectors)
 	
@@ -53,6 +54,9 @@
 (load "vulkan/pipeline.scm")
 (load "vulkan/images.scm")
 (load "vulkan/buffers.scm")
+
+;; (start-frame-capture)
+
 (load "vulkan/sync.scm")
 
 

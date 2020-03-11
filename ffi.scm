@@ -74,19 +74,19 @@
 
   (define string->ptr
     (case-lambda
-      [(str)
-       (string->ptr str (unbox (malloc (* (ftype-sizeof char)
-					  (string-length str)))) 0)]
-      [(str ptr)
-       (string->ptr str ptr 0)]
-      [(str ptr offset)
-       (let lp ((i offset))
-       	 (cond
-       	  ((= i (+ (string-length str) offset))
-       	   (foreign-set! 'char ptr i #\nul)
-	   ptr)
-       	  (else (foreign-set! 'char ptr i (string-ref str (- i offset)))
-       		(lp (+ 1 i)))))]))
+     [(str)
+      (string->ptr str (unbox (malloc (* (ftype-sizeof char)
+					 (string-length str)))) 0)]
+     [(str ptr)
+      (string->ptr str ptr 0)]
+     [(str ptr offset)
+      (let lp ((i offset))
+	(cond
+	 ((= i (+ (string-length str) offset))
+	  (foreign-set! 'char ptr i #\nul)
+	  ptr)
+	 (else (foreign-set! 'char ptr i (string-ref str (- i offset)))
+	       (lp (+ 1 i)))))]))
 
   ;; (string->ptr "abcd")
 
@@ -112,8 +112,8 @@
     (lambda (strs)
       (let ((ptr (unbox (malloc (* (ftype-sizeof char)
   				   (apply +
-				     (map (lambda (s) (+ 1 (string-length s)))
-					  strs)))))))
+					  (map (lambda (s) (+ 1 (string-length s)))
+					       strs)))))))
   	(let loop ((i 0)
   		   (s strs))
 	  (write "loop daa:")
@@ -132,19 +132,19 @@
 
   (define ptr->strings
     (case-lambda
-      ((ptr-info)
-       (ptr->strings (cdr ptr-info) (car ptr-info)))
-      ((ptr count)
-       (let ((ptr (cond
-		   ((ftype-pointer? ptr) ptr)
-		   (else (make-ftype-pointer uptr ptr)))))
-	 (let lp ((i 0)
-		  (strs (list)))
-	   (cond
-	    ((= i count) (reverse strs))
-	    (else (lp (+ 1 i)
-		      (cons (ptr->string (ftype-ref uptr () ptr i))
-			    strs)))))))))
+     ((ptr-info)
+      (ptr->strings (cdr ptr-info) (car ptr-info)))
+     ((ptr count)
+      (let ((ptr (cond
+		  ((ftype-pointer? ptr) ptr)
+		  (else (make-ftype-pointer uptr ptr)))))
+	(let lp ((i 0)
+		 (strs (list)))
+	  (cond
+	   ((= i count) (reverse strs))
+	   (else (lp (+ 1 i)
+		     (cons (ptr->string (ftype-ref uptr () ptr i))
+			   strs)))))))))
 
   
   (define strdup (foreign-procedure "strdup" (string) string))
@@ -189,8 +189,8 @@
 		((ftype-pointer? struct-name obj)
 		 (let ((value (f struct-name member-spec obj)))
 		   (if (ftype-pointer? char value)
-		     (ptr->string value)
-		     value)))
+		       (ptr->string value)
+		       value)))
 		(else (raise (ffi-condition "invalid pointer" obj lambda-name)))))))))
 
 
@@ -248,7 +248,8 @@
 		       (list->array-pointer-lambda (construct-name #'pointer-type
 								   "list->"
 								   #'pointer-type
-								   "-pointer-array")))
+								   "-pointer-array"))
+		       )
 	   #'(begin
 	       (define map-lambda
 		 (lambda (f arr-ptr)
@@ -275,14 +276,14 @@
 						 (array-pointer-raw-ptr arr-ptr)
 						 i)))
 			      (if (f e)
-				e
-				(lp (fx+ 1 i)))))))))
+				  e
+				  (lp (fx+ 1 i)))))))))
 
 	       (define car-lambda
 		 (lambda (arr-ptr)
 		   (if (> 1 (array-pointer-length arr-ptr))
-		     #f
-		     (array-pointer-raw-ptr arr-ptr))))
+		       #f
+		       (array-pointer-raw-ptr arr-ptr))))
 
 	       (define for-each-lambda
 		 (lambda (f arr-ptr)
@@ -360,7 +361,7 @@
 		       (member-info
 			(map (lambda (member-spec)
 			       (with-syntax* ((field-name (datum->syntax #'name
-							    (car member-spec)))
+									 (car member-spec)))
 					      (field-getter (construct-name #'name
 									    #'type
 									    "-"
@@ -448,8 +449,8 @@
 			 (with-syntax* (((getters ...)
 					 (map (lambda (member-spec)
 						(with-syntax* ((field-name (datum->syntax
-									       #'name
-									     (car member-spec)))
+									    #'name
+									    (car member-spec)))
 							       (suffix
 								(construct-name #'struct-name
 										#'name
@@ -469,10 +470,10 @@
 			   #'(define lambda-name
 			       (lambda (ptr)
 				 (if (ftype-pointer? struct-name ptr)
-				   (map (lambda (i)
-					  (ftype-ref struct-name (name i) ptr))
-					(iota size))
-				   (raise (ffi-condition "invalid pointer" ptr lambda-name)))))))
+				     (map (lambda (i)
+					    (ftype-ref struct-name (name i) ptr))
+					  (iota size))
+				     (raise (ffi-condition "invalid pointer" ptr lambda-name)))))))
 
 			;; scalar / pointer getters
 			(else (construct-ptr-lambdas #'name (list #'name)))))))
@@ -518,15 +519,15 @@
     (define (enum e*)
       (let f ([e* e*] [n 0])
 	(if (null? e*)
-	  '()
-	  (syntax-case (car e*) ()
-	    [(e v)
-	     (cons #'(e v)
-		   (f (cdr e*)
-		      (+ (syntax->datum #'v) 1)))]
-	    [e (identifier? #'e)
-	       (cons #`(e #,n)
-		     (f (cdr e*) (+ n 1)))]))))
+	    '()
+	    (syntax-case (car e*) ()
+	      [(e v)
+	       (cons #'(e v)
+		     (f (cdr e*)
+			(+ (syntax->datum #'v) 1)))]
+	      [e (identifier? #'e)
+		 (cons #`(e #,n)
+		       (f (cdr e*) (+ n 1)))]))))
     (syntax-case x ()
       [(_ name e* ...)
        (with-syntax ([((e v) ...) (enum #'(e* ...))])
