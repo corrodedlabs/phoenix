@@ -154,7 +154,7 @@
 	  (vk-cmd-bind-vertex-buffers cmd-buffer
 	  			      0
 	  			      1
-	  			      (buffer-handle vertex-buffer)
+				      vertex-buffers
 	  			      offsets)
 	  (vk-cmd-bind-index-buffer cmd-buffer
 	  			    (buffer-handle index-buffer)
