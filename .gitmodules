@@ -4,3 +4,6 @@
 [submodule "glfw"]
 	path = glfw
 	url = https://github.com/chenguangqi/glfw
+[submodule "phoenix-libs"]
+	path = phoenix-libs
+	url = git@github.com:corrodedlabs/phoenix-libs.git
