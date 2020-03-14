@@ -175,7 +175,7 @@
 						    vk-false
 						    vk-polygon-mode-fill
 						    vk-cull-mode-back-bit
-						    vk-front-face-clockwise
+						    vk-front-face-counter-clockwise
 						    vk-false
 						    0.0
 						    0.0
@@ -244,8 +244,8 @@
   (let* ((descriptor-layout (create-descriptor-layout device))
 	 (layout-info
 	  (make-vk-pipeline-layout-create-info pipeline-layout-create-info 0 0
-					       0
-					       (null-pointer vk-descriptor-set-layout)
+					       1
+					       descriptor-layout
 					       0
 					       (null-pointer vk-push-constant-range)))
 	 (layout (make-foreign-object vk-pipeline-layout)))

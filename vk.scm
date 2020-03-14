@@ -10,6 +10,7 @@
 	(ffi)
 	(glfw)
 	(shaderc)
+	(camera)
 	;; (renderdoc)
 
 	(srfi s43 vectors)

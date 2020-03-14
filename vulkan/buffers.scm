@@ -39,12 +39,12 @@
     ((device command-pool num-buffer)
      (let ((info (make-vk-command-buffer-allocate-info command-buffer-allocate-info
 						       0
-						       (pointer-ref-value command-pool)
+ 						       (pointer-ref-value command-pool)
 						       vk-command-buffer-level-primary
 						       num-buffer))
 	   (command-buffer (if (fx=? num-buffer 1)
-			       (make-foreign-object vk-command-buffer)
-			       (make-foreign-array vk-command-buffer num-buffer))))
+			     (make-foreign-object vk-command-buffer)
+			     (make-foreign-array vk-command-buffer num-buffer))))
        (vk-allocate-command-buffers device info command-buffer)
        command-buffer))))
 
@@ -109,14 +109,13 @@
 						command-buffers
 						'vk-command-buffer)))
       
-      (map (lambda (cmd-buffer frame-buffer )
+      (map (lambda (cmd-buffer frame-buffer descriptor-set)
 	     (start-command-buffer-recording cmd-buffer)
-	     (f cmd-buffer frame-buffer)
+	     (f cmd-buffer frame-buffer descriptor-set)
 	     (end-command-buffer-recording cmd-buffer))
 	   (vk-command-buffer-pointer-map identity cmd-buffers-ptr)
 	   framebuffers
-	   ;; descriptor-sets
-	   )
+	   descriptor-sets)
       cmd-buffers-ptr)))
 
 
@@ -160,14 +159,14 @@
 	  			    (buffer-handle index-buffer)
 	  			    0
 	  			    vk-index-type-uint32)
-	  ;; (vk-cmd-bind-descriptor-sets cmd-buffer
-	  ;; 			       vk-pipeline-bind-point-graphics
-	  ;; 			       (pipeline-layout pipeline)
-	  ;; 			       0
-	  ;; 			       1
-	  ;; 			       descriptor-set
-	  ;; 			       0
-	  ;; 			       (null-pointer u32))
+	  (vk-cmd-bind-descriptor-sets cmd-buffer
+	  			       vk-pipeline-bind-point-graphics
+	  			       (pipeline-layout pipeline)
+	  			       0
+	  			       1
+	  			       descriptor-set
+	  			       0
+	  			       (null-pointer u32))
 	  (vk-cmd-draw-indexed cmd-buffer (length indices) 1 0 0 0)
 	  (vk-cmd-end-render-pass cmd-buffer)
 	  cmd-buffer)))
@@ -181,10 +180,10 @@
 			      command-pool
 			      framebuffers
 			      descriptor-sets
-			      (lambda (cmd-buffer framebuffer )
+			      (lambda (cmd-buffer framebuffer descriptor-set)
 				(perform-render-pass cmd-buffer
 						     framebuffer
-						     #f
+						     descriptor-set
 						     vertex-buffer
 						     index-buffer
 						     render-area
@@ -369,17 +368,12 @@
 
 (define-record-type uniform-buffer-data (fields model view projection))
 
-(define (uniform-buffer-data->list data)
-  (append (uniform-buffer-data-model data)
-	  (uniform-buffer-data-projection data)
-	  (uniform-buffer-data-view data)))
+(define (uniform-buffer-data->list data) (mvp-matrix->list data))
 
 (define (extent->uniform-buffer-data extent)
   (let ((width (vk-extent-2d-width extent))
 	(height (vk-extent-2d-height extent)))
-    (make-uniform-buffer-data (list 0.0 0.0 0.0 0.0)
-			      (list 0.0 0.0 0.0 0.0)
-			      (list 0.0 0.0 0.0 0.0))))
+    (calculate-mvp-matrix width height)))
 
 
 
@@ -506,27 +500,27 @@
 (define swapchain (vulkan-state-swapchain vs))
 (define extent (swapchain-extent (vulkan-state-swapchain vs)))
 
-;; (define uniform-buffer-data-list
-;;   (uniform-buffer-data->list (extent->uniform-buffer-data extent)))
+(define uniform-buffer-data-list
+  (uniform-buffer-data->list (extent->uniform-buffer-data extent)))
 
-;; (define uniform-buffers
-;;   (create-uniform-buffers physical-device
-;; 			  device
-;; 			  uniform-buffer-data-list
-;; 			  (length framebuffers)))
+(define uniform-buffers
+  (create-uniform-buffers physical-device
+			  device
+			  uniform-buffer-data-list
+			  (length framebuffers)))
 
-;; (define descriptor-count (length uniform-buffers))
+(define descriptor-count (length uniform-buffers))
 
-;; (define descriptor-pool (create-descriptor-pool device
-;; 						(length uniform-buffers)))
+(define descriptor-pool (create-descriptor-pool device
+						(length uniform-buffers)))
 
-;; (define descriptor-layout (pipeline-descriptor-set-layout pipeline))
-;; (define num-sets (length uniform-buffers))
+(define descriptor-layout (pipeline-descriptor-set-layout pipeline))
+(define num-sets (length uniform-buffers))
 
-;; (define sets (create-descriptor-sets device
-;; 				     descriptor-pool
-;; 				     descriptor-layout
-;; 				     uniform-buffers))
+(define sets (create-descriptor-sets device
+				     descriptor-pool
+				     descriptor-layout
+				     uniform-buffers))
 
 ;; (define depth-buffer-image
 ;;   (create-depth-buffer-image physical-device device command-pool graphics-queue swapchain))
@@ -536,7 +530,7 @@
 (display "going to created cmd buffers") (newline)
 
 (define cmd-buffers
-  (create-command-buffers device swapchain command-pool pipeline framebuffers #f))
+  (create-command-buffers device swapchain command-pool pipeline framebuffers sets))
 
 (displayln "command buffers created" cmd-buffers)
 

@@ -1,9 +1,10 @@
 (library (camera)
   ;; exporting function necessary to provide a view into the world created
   ;; this data will be used by the uniform buffer
-  (export calculate-mvp-matrix)
+  (export calculate-mvp-matrix
+	  mvp-matrix->list)
 
-  (import (scheme)
+  (import (except (scheme) vector->list)
 	  (matchable))
 
   (define-record-type point3 (fields x y z))
@@ -11,6 +12,16 @@
 
   (define-record-type vector4 (fields x y z w))
   (define-record-type matrix4 (fields x y z w))
+
+  (define vector->list
+    (lambda (vector)
+      (match vector
+	(($ vector4 x y z w) (list x y z w)))))
+
+  (define matrix->list
+    (lambda (matrix)
+      (match matrix
+	(($ matrix4 x y z w) (apply append (map vector->list (list x y z w)))))))
 
   (define π 3.14159265358979323846264338327950288)
 
@@ -92,6 +103,12 @@
 
 
   (define-record-type mvp-matrix (fields model view projection))
+
+  (define mvp-matrix->list
+    (lambda (mvp-matrix-obj)
+      (match mvp-matrix-obj
+	(($ mvp-matrix model view projection)
+	 (apply append (map matrix->list (list model view projection)))))))
 
   (define calculate-mvp-matrix
     (lambda (screen-width screen-height)
