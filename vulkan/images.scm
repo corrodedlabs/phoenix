@@ -270,6 +270,69 @@
       (create-gpu-image depth-property))))
 
 
+(define create-texture-image
+  (lambda (physical-device device command-pool graphics-queue swapchain texture-path)
+
+    (define copy-buffer-to-image
+      (lambda (buffer image width height)
+	(let* ((subresource (make-vk-image-subresource-layers vk-image-aspect-color-bit 0 0 1))
+	       (offset (make-vk-offset-3d 0 0 0))
+	       (extent (make-vk-extent-3d width height 1))
+	       (region (make-vk-buffer-image-copy 0 0 0 subresource offset extent)))
+	  (execute-command-buffer device
+				  command-pool
+				  graphics-queue
+				  (lambda (command-buffer)
+				    (vk-cmd-copy-buffer-to-image command-buffer
+								 buffer
+								 image
+								 vk-image-layout-transfer-dst-optimal
+								 1
+								 region))))))
+
+    (define create-image-for-texture
+      (lambda (image-buffer image-data)
+	(let* ((width (image-data-width image-data))
+	       (height (image-data-height image-data))
+	       (property (create-texture-property width height))
+	       (image-handle (create-image-handle device property))
+	       (memory (allocate-image-memory physical-device device image-handle)))
+	  (bind-image-memory device image-handle memory)
+	  (transition-image-layout device
+				   command-pool
+				   graphics-queue
+				   vk-format-r8g8b8a8-unorm
+				   image-handle
+				   vk-image-layout-undefined
+				   vk-image-layout-transfer-dst-optimal)
+	  (copy-buffer-to-image image-buffer image-handle width height)
+	  (transition-image-layout device
+				   command-pool
+				   graphics-queue
+				   vk-format-r8g8b8a8-unorm
+				   image-handle
+				   vk-image-layout-transfer-dst-optimal
+				   vk-image-layout-shader-read-only-optimal)
+	  (cons (make-gpu-image image-handle #f memory) property))))
+
+    (define create-texture-image-handle
+      (lambda (texture-path)
+	(with-image texture-path
+		    (lambda (image)
+		      (let ((buffer (create-host-buffer physical-device
+							device
+							(make-heap-data (image-data-pointer image)
+									(image-data-size image)))))
+			(create-image-for-texture (buffer-handle buffer) image))))))
+
+
+    (match (create-texture-image-handle texture-path)
+      ((image . property)
+       (match image
+	 (($ gpu-image handle _ memory)
+	  (make-gpu-image handle (create-image-view device handle property) memory)))))))
+
+
 #!eof
 ;; Sample usage
 
