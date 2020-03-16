@@ -1,5 +1,10 @@
-(library (phoenix image)
-  (export with-image)
+(library (image)
+  (export with-image
+	  image-data-pointer
+	  image-data-width
+	  image-data-height
+	  image-data-size
+	  image-data?)
   (import (scheme)
 	  (ffi))
 
@@ -16,17 +21,23 @@
   ;; stbi_free is just free
   (define stbi_free (foreign-procedure "free" (stbi-uc) void))
 
+  (define-record-type image-data (fields pointer width height size))
+
   (define with-image
     (lambda (image-path f)
+      ;; image is image-data
       (let ((image #f))
 	(dynamic-wind
 	    (lambda ()
 	      (let ((width (make-foreign-object int))
 		    (height (make-foreign-object int))
 		    (channels (make-foreign-object int)))
-		(set! image (cons (stbi_load image-path width height channels stbi-rgb-alpha)
-				  (fx* (read-int width) (read-int height) 4)))))
+		(set! image
+		      (make-image-data (stbi_load image-path width height channels stbi-rgb-alpha)
+				       (read-int width)
+				       (read-int height)
+				       (fx* (read-int height) (read-int width) 4)))))
 	    (lambda () (f image))
 	    (lambda ()
 	      (display "free image") (newline)
-	      (stbi_free (car image))))))))
+	      (stbi_free (image-data-pointer image))))))))

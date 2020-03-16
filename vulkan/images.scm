@@ -78,6 +78,15 @@
 			   vk-image-usage-depth-stencil-attachment-bit
 			   vk-image-aspect-depth-bit)))
 
+(define create-texture-property
+  (lambda (texture-width texture-height)
+    (make-image-properties texture-width
+			   texture-height
+			   vk-format-r8g8b8a8-unorm
+			   (bitwise-ior vk-image-usage-transfer-dst-bit
+					vk-image-usage-sampled-bit)
+			   vk-image-aspect-color-bit)))
+
 (define allocate-image-memory
   (lambda (physical-device device image-handle)
 
@@ -259,6 +268,7 @@
 				    vk-format-feature-depth-stencil-attachment-bit))
 	   (depth-property (create-depth-property extent supported-format)))
       (create-gpu-image depth-property))))
+
 
 #!eof
 ;; Sample usage

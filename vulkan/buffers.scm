@@ -67,7 +67,7 @@
    ((command-buffer)
     (vk-end-command-buffer command-buffer))
    ((command-buffer graphics-queue)
-    (end-command-buffer-recording command-buffer)
+    (vk-end-command-buffer command-buffer)
     (let ((submit-info (make-vk-submit-info submit-info 0
 					    0
 					    (null-pointer vk-semaphore)
@@ -279,70 +279,86 @@
 						    copy-region))))))
 
 
-(define data-size
-  (lambda (data)
-    (cond
-     ((vertex-input? (car data)) (sizeof-vertex-input-arr data))
-     ((number? (car data)) (* 4 (length data))))))
-
+;; record to represent a chunk of heap data which can be copied over to gpu blocks
+;; using vkMapMemory and memcpy
+(define-record-type heap-data (fields pointer size))
 
 
 ;; copy data from cpu to gpu host local memory
 (define copy-data
   (lambda (device memory data)
-    
+    (match data
+      (($ heap-data data-ptr size)
+       (let ((dst-ptr (make-foreign-object uptr)))
+	 (vk-map-memory device memory 0 size 0 (ftype-pointer-address dst-ptr))
+	 (memcpy (pointer-ref-value dst-ptr) data-ptr size)
+	 (vk-unmap-memory device memory))))))
+
+;; the predicates in the cond of sizeof-data and scheme-data->c-pointer
+;; represent the types supported
+
+;; get the sizeof data where data consists of scheme values (list? or vertex-input?)
+(define sizeof-scheme-data
+  (lambda (data)
+    (cond
+     ((heap-data? data) (heap-data-size data))
+     ((vertex-input? (car data)) (sizeof-vertex-input-arr data))
+     ((number? (car data)) (* 4 (length data))))))
+
+;; convert scheme values to c pointers representing those values
+(define scheme-data->c-pointer
+  (lambda (data)
+    (ftype-pointer-address
+     (array-pointer-raw-ptr
+      (cond
+       ((vertex-input? (car data))
+	(list->float-pointer-array
+	 (map-indexed (lambda (value i)
+			(displayln "setting value" value)
+			(let ((ptr (make-foreign-object float)))
+			  (ftype-set! float () ptr value)
+			  ptr)) 
+		      (vertices->list data))))
+
+       ((inexact? (car data))
+	(list->float-pointer-array
+	 (map-indexed (lambda (value i)
+			(let ((ptr (make-foreign-object float)))
+			  (ftype-set! float () ptr value)
+			  ptr))
+		      data)))
+
+       ((number? (car data))
+	(list->u32-pointer-array
+	 (map-indexed (lambda (value i)
+			(displayln "setting value" value)
+			(let ((ptr (make-foreign-object u32)))
+			  (ftype-set! u32 () ptr value)
+			  ptr)) 
+		      data))))))))
+
+(define copy-data-from-scheme
+  (lambda (device memory data)
     (let ((data-ptr (make-foreign-object uptr))
-
-	  (size (data-size data)))
-      (vk-map-memory device memory 0 size 0 (ftype-pointer-address data-ptr))
-      (displayln "size if " size)
-      (memcpy (pointer-ref-value data-ptr)
-	      (ftype-pointer-address
-	       (array-pointer-raw-ptr
-		(cond
-		 ((vertex-input? (car data))
-		  (list->float-pointer-array
-		   (map-indexed (lambda (value i)
-				  (displayln "setting value" value)
-				  (let ((ptr (make-foreign-object float)))
-				    (ftype-set! float () ptr value)
-				    ptr)) 
-				(vertices->list data))))
-
-		 ((inexact? (car data))
-		  (list->float-pointer-array
-		   (map-indexed (lambda (value i)
-				  (let ((ptr (make-foreign-object float)))
-				    (ftype-set! float () ptr value)
-				    ptr))
-				data)))
-
-		 ((number? (car data))
-		  (list->u32-pointer-array
-		   (map-indexed (lambda (value i)
-				  (displayln "setting value" value)
-				  (let ((ptr (make-foreign-object u32)))
-				    (ftype-set! u32 () ptr value)
-				    ptr)) 
-				data))))))
-	      size)
-      (displayln "ftype" (ftype-pointer->sexpr data-ptr))
-      (vk-unmap-memory device memory))))
+	  (size (sizeof-scheme-data data)))
+      (copy-data device memory (cond
+				((heap-data? data) data)
+				(else (make-heap-data (scheme-data->c-pointer data) size)))))))
 
 
 ;; buffer created using HOST_VISIBLE and HOST_COHERENT
 ;; can be used as staging buffer
 (define create-host-buffer
   (case-lambda
-    ((physical-device device data) (create-host-buffer physical-device device data #f))
-    ((physical-device device data usage)
-     (let* ((size (data-size data))
-	    (buffer-ptr (create-new-buffer device size host-local usage))
-	    (memory (allocate-memory physical-device device buffer-ptr host-local)))
-       (vk-bind-buffer-memory device buffer-ptr memory 0)
-       (copy-data device memory data)
-       (displayln "ok creating a host local buffer for data" data)
-       (make-buffer buffer-ptr memory size)))))
+   ((physical-device device data) (create-host-buffer physical-device device data #f))
+   ((physical-device device data usage)
+    (let* ((size (sizeof-scheme-data data))
+	   (buffer-ptr (create-new-buffer device size host-local usage))
+	   (memory (allocate-memory physical-device device buffer-ptr host-local)))
+      (vk-bind-buffer-memory device buffer-ptr memory 0)
+      (copy-data-from-scheme device memory data)
+      (displayln "ok creating a host local buffer for data" data)
+      (make-buffer buffer-ptr memory size)))))
 
 ;; create high performance gpu buffer
 ;; a staging buffer will be used to copy the data over
@@ -350,7 +366,7 @@
 (define create-gpu-local-buffer
   (lambda (physical-device device graphics-queue data usage)
     (let* ((staging-buffer (create-host-buffer physical-device device data))
-	   (size (data-size data))
+	   (size (sizeof-scheme-data data))
 	   (gpu-buffer-ptr (create-new-buffer device size gpu-local usage))
 	   (memory (allocate-memory physical-device device gpu-buffer-ptr gpu-local)))
       (vk-bind-buffer-memory device gpu-buffer-ptr memory 0)
@@ -410,7 +426,7 @@
     (define num-sets (length uniform-buffers))
 
     ;; uniform buffer  object suze
-    (define ubo-size (data-size uniform-buffer-data-list))
+    (define ubo-size (sizeof-scheme-data uniform-buffer-data-list))
 
     (define allocate-descriptor-sets
       (lambda ()
@@ -428,6 +444,7 @@
 	  (make-array-pointer num-sets set 'vk-descriptor-set))))
 
     (let ((descriptor-sets  (allocate-descriptor-sets)))
+      (displayln "ubo size is" ubo-size)
       (map (lambda (uniform-buffer descriptor-set)
 	     (let* ((buffer-info
 		     (make-vk-descriptor-buffer-info (pointer-ref-value uniform-buffer)
@@ -535,7 +552,7 @@
 (displayln "command buffers created" cmd-buffers)
 
 ;; (define memory (buffer-memory buf))
-;; (define data-size (buffer-size buf))
+;; (define data-size(buffer-size buf))
 
 
 

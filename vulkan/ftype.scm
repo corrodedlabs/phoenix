@@ -13,6 +13,9 @@
 (define-ftype u64 unsigned-64)
 (define-ftype flags uint32-t)
 
+(define-ftype i32 integer-32)
+(define-ftype i64 integer-64)
+
 (define-collection-lambdas u32)
 (define-collection-lambdas u64)
 (define-collection-lambdas float)
@@ -610,8 +613,9 @@
    (max-depth . float)))
 
 (define-foreign-struct vk-offset-2d  ((x . unsigned-32) (y . unsigned-32)))
-
 (define-foreign-struct vk-rect-2d ((offset . vk-offset-2d) (extent . vk-extent-2d)))
+
+(define-foreign-struct vk-offset-3d ((x . i32) (y . i32) (z . i32)))
 
 (define-vulkan-struct vk-pipeline-viewport-state-create-info
   ((flags . flags)
@@ -1205,9 +1209,25 @@
    (dst-offset . vk-device-size)
    (size . vk-device-size)))
 
-(define-render-pass-command vk-cmd-copy-buffer
-  ((& vk-buffer) (& vk-buffer) u32 (* vk-buffer-copy)))
+(define-render-pass-command vk-cmd-copy-buffer ((& vk-buffer) (& vk-image) u32 (* vk-buffer-copy)))
 
+(define-foreign-struct vk-image-subresource-layers
+  ((aspect-mask . flags)
+   (mip-level . u32)
+   (base-array-layer . u32)
+   (layer-count . u32)))
+
+(define-foreign-struct vk-buffer-image-copy
+  ((buffer-offset . vk-device-size)
+   (buffer-row-length . u32)
+   (buffer-image-height . u32)
+   (image-subresource . vk-image-subresource-layers)
+   (image-offset . vk-offset-3d)
+   (image-extent . vk-extent-3d)))
+
+
+(define-render-pass-command vk-cmd-copy-buffer-to-image
+  ((& vk-buffer) (& vk-image) vk-image-layout u32 (* vk-buffer-image-copy)))
 
 ;; ftypes to submit command buffer to queue
 
@@ -1336,7 +1356,6 @@
    (results . (* int))))
 
 (define-vulkan-command vkQueuePresentKHR ((& vk-queue) (* vk-present-info)))
-
 
 #!eof
 
