@@ -9,6 +9,7 @@
 	  strings->ptr
 	  
 	  read-int
+	  read-unsigned
 	  read-unsigned-32
 
 	  memcpy
@@ -157,6 +158,11 @@
   (define-syntax read-int
     (syntax-rules ()
       ((_ ptr) (ftype-ref int () ptr))))
+
+  (define-syntax read-unsigned
+    (syntax-rules ()
+      ((_ ptr) (ftype-ref unsigned () ptr))))
+
 
   (define-syntax read-unsigned-32
     (syntax-rules ()
@@ -327,6 +333,8 @@
       ;; used for generating nested setters and getters for ftypes
       (define struct-info)
 
+      (define scalar-type '(unsigned-32 int uptr unsigned))
+
       (define array-type?
 	(lambda (type)
 	  (and (list? type)
@@ -336,7 +344,6 @@
       
       (define construct-make-def
 	(lambda (struct-name member-spec member-details)
-	  (define scalar-type '(unsigned-32 int uptr))
 	  
 	  ;; generates the setter expression for a type
 	  (define struct-set-syntax
@@ -491,7 +498,9 @@
 	   (let ((member-details (filter identity
 					 (map (lambda (type)
 						(let ((members (and (identifier? type)
-								    (lookup type #'struct-info))))
+								  (member type scalar-type)
+								  (lookup type #'struct-info))))
+						  (display "members") (display members) (newline)
 						  (cond
 						   (members
 						    (cons (syntax->datum type) members))
