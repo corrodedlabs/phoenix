@@ -47,7 +47,7 @@
 				       (cdr *validation-layers-info*)
 				       1
 				       (strings->ptr +device-extensions+)
-				       0))))
+				       (ftype-pointer-address enabled-features)))))
     
     (let ((device-info (create-device-info))
 	  (device (make-foreign-object vk-device)))

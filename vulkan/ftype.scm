@@ -260,6 +260,93 @@
    (queue-count . unsigned-32)
    (queue-priorities . (* float))))
 
+(define-syntax define-features
+  (lambda (stx)
+    (syntax-case stx ()
+      ((_ id feature ...)
+       (with-syntax ((init-pointer (construct-name #'id "init-feature-pointer"))
+		     (enable-features (construct-name #'id "enable-features")))
+	 #'(begin (define-ftype id
+		    (struct (feature vk-bool32) ...))
+		  
+		  (define init-pointer
+		    (lambda ()
+		      (let ((ptr (make-foreign-object id)))
+			(ftype-set! id (feature) ptr vk-false)
+			...
+			ptr)))
+
+		  (meta trace-define-syntax enable-features
+			(syntax-rules ()
+			  ((_ enabled-feature (... ...))
+			   (let ((features (init-feature-pointer)))
+			     ;; enable required feature
+			     (ftype-set! vk-physical-device-features
+					 (enabled-feature)
+					 features
+					 vk-true)
+			     (... ...)
+			     features))))))))))
+
+(define-features vk-physical-device-features
+  robust-buffer-access
+  full-draw-index-uint32
+  image-cube-array
+  independent-blend
+  geometry-shader
+  tessellation-shader
+  sample-rate-shading
+  dual-src-blend
+  logic-op
+  multi-draw-indirect
+  draw-indirect-first-instance
+  depth-clamp
+  depth-bias-clamp
+  fill-mode-non-solid
+  depth-bounds
+  wide-lines
+  large-points
+  alpha-to-one
+  multi-viewport
+  sampler-anisotropy
+  texture-compression-etc2
+  texture-compression-astc-ldr
+  texture-compression-bc
+  occlusion-query-precise
+  pipeline-statistics-query
+  vertex-pipeline-stores-and-atomics
+  fragment-stores-and-atomics
+  shader-tessellation-and-geometry-point-size
+  shader-image-gather-extended
+  shader-storage-image-extended-formats
+  shader-storage-image-multisample
+  shader-storage-image-read-without-format
+  shader-storage-image-write-without-format
+  shader-uniform-buffer-array-dynamic-indexing
+  shader-sampled-image-array-dynamic-indexing
+  shader-storage-buffer-array-dynamic-indexing
+  shader-storage-image-array-dynamic-indexing
+  shader-clip-distance
+  shader-cull-distance
+  shader-float64
+  shader-int64
+  shader-int16
+  shader-resource-residency
+  shader-resource-min-lod
+  sparse-binding
+  sparse-residency-buffer
+  sparse-residency-image2-d
+  sparse-residency-image3-d
+  sparse-residency2-samples
+  sparse-residency4-samples
+  sparse-residency8-samples
+  sparse-residency16-samples
+  sparse-residency-aliased
+  variable-multisample-rate
+  inheritedQueries)
+
+(define enabled-features (enable-features sampler-anisotropy))
+
 (define-vulkan-struct vk-device-create-info
   ((flags . unsigned-32)
    (queue-create-info-count . unsigned-32)
@@ -1230,6 +1317,53 @@
   ((& vk-buffer) (& vk-image) vk-image-layout u32 (* vk-buffer-image-copy)))
 
 ;; ftypes to submit command buffer to queue
+
+(define-enum-ftype vk-filter
+  vk-filter-nearest
+  vk-filter-linear
+  (vk-filter-cubic-img 1000015000))
+
+(define-enum-ftype vk-border-color
+  (vk-border-color-float-transparent-black  0)
+  (vk-border-color-int-transparent-black  1)
+  (vk-border-color-float-opaque-black  2)
+  (vk-border-color-int-opaque-black  3)
+  (vk-border-color-float-opaque-white  4)
+  (vk-border-color-int-opaque-white  5))
+
+(define-enum-ftype vk-sampler-address-mode
+  (vk-sampler-address-mode-repeat  0)
+  (vk-sampler-address-mode-mirrored-repeat  1)
+  (vk-sampler-address-mode-clamp-to-edge  2)
+  (vk-sampler-address-mode-clamp-to-border  3)
+  (vk-sampler-address-mode-mirror-clamp-to-edge  4))
+
+(define-enum-ftype vk-sampler-mipmap-mode
+  vk-sampler-mipmap-mode-nearest vk-sampler-mipmap-mode-linear)
+
+(define-vulkan-struct vk-sampler-create-info
+  ((flags . flags)
+   (mag-filter . vk-filter)
+   (min-filter . vk-filter)
+   (mip-map-mode . vk-sampler-mipmap-mode)
+   (address-mode-u . vk-sampler-address-mode)
+   (address-mode-v . vk-sampler-address-mode)
+   (address-mode-w . vk-sampler-address-mode)
+   (mip-load-bias . single-float)
+   (anisotropy-enable . vk-bool32)
+   (max-anisotropy . single-float)
+   (compare-enable . vk-bool32)
+   (compare-op . vk-compare-op)
+   (min-lod . single-float)
+   (max-load . single-float)
+   (border-color . vk-border-color)
+   (unnormalized-coordinates . vk-bool32)))
+
+
+(define-vulkan-command vkCreateSampler
+  ((& vk-device) (* vk-sampler-create-info) uptr (* vk-sampler)))
+
+
 
 (define-ftype vk-semaphore uptr)
 (define-ftype vk-fence uptr)
