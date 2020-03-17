@@ -842,6 +842,8 @@
    (stage-flags . flags)
    (immutable-samplers . (* vk-sampler))))
 
+(define-collection-lambdas vk-descriptor-set-layout-binding)
+
 (define-vulkan-struct vk-descriptor-set-layout-create-info
   ((flags . flags)
    (binding-count . unsigned-32)
@@ -1391,6 +1393,8 @@
   ((type . vk-descriptor-type)
    (descriptor-count . u32)))
 
+(define-collection-lambdas vk-descriptor-pool-size)
+
 (define-vulkan-struct vk-descriptor-pool-create-info
   ((flags . flags)
    (max-sets . u32)
@@ -1434,6 +1438,8 @@
    (image-info . (* vk-descriptor-image-info))
    (buffer-info . (* vk-descriptor-buffer-info))
    (texel-buffer-view . (* vk-buffer-view))))
+
+(define-collection-lambdas vk-write-descriptor-set)
 
 (define-vulkan-command vkUpdateDescriptorSets
   ((& vk-device) u32 (* vk-write-descriptor-set) u32 uptr))

@@ -34,13 +34,14 @@
 
 ;; vertex input 
 
-(define-record-type vertex-input (fields position color))
+(define-record-type vertex-input (fields position color texture-coord))
 
 
 (define vertex-input-total-length
   (lambda (input)
     (fx+ (vector-length (vertex-input-position input))
-	 (vector-length (vertex-input-color input)))))
+	 (vector-length (vertex-input-color input))
+	 (vector-length (vertex-input-texture-coord input)))))
 
 ;; assuming that we are using float for everything
 (define vertex-input-total-size
@@ -71,7 +72,8 @@
   (lambda (vertices)
     (apply vector-append
 	   (map (lambda (v)
-		  (vector-append (vertex-input-position v) (vertex-input-color v)))
+		  (match v
+		    (($ vertex-input pos color tex-coord) (vector-append pos color tex-coord))))
 		vertices))))
 
 (define vertices->list
@@ -90,16 +92,27 @@
 		 vertices))))
 
 (define vector->attr
-  (lambda (v)
-    (case (vector-length v)
-      ((2) (cons vk-format-r32g32-sfloat 0))
-      ((3) (cons vk-format-r32g32b32-sfloat 8))
-      (else (error "unsupported vector" v)))))
+  (lambda (input)
+    (let lp ((elems input)
+	     (offset 0)
+	     (attrs (list)))
+      (cond
+       ((null? elems) (reverse attrs))
+       (else
+	(case (vector-length (car elems))
+	  ((2) (lp (cdr elems)
+		   (fx+ offset (* 2 4))
+		   (cons (cons vk-format-r32g32-sfloat offset) attrs)))
+	  ((3) (lp (cdr elems)
+		   (fx+ offset (* 3 4))
+		   (cons (cons vk-format-r32g32b32-sfloat offset) attrs)))
+	  (else (error "unsupported vector" v))))))))
 
 (define vertex-input->attrs
   (lambda (input)
-    (list (vector->attr (vertex-input-position input)) 
-	  (vector->attr (vertex-input-color input)))))
+    (vector->attr (list (vertex-input-position input)
+			(vertex-input-color input)
+			(vertex-input-texture-coord input)))))
 
 
 ;; setup vertex input descriptors
@@ -220,18 +233,26 @@
 
 (define create-descriptor-layout
   (lambda (device)
-    (let* ((binding
+    (let* ((uniform-buffer-binding
 	    (make-vk-descriptor-set-layout-binding 0
 						   vk-descriptor-type-uniform-buffer
 						   1
 						   vk-shader-stage-vertex-bit
 						   (null-pointer vk-sampler)))
+	   (texture-sampler-binding
+	    (make-vk-descriptor-set-layout-binding 1
+						   vk-descriptor-type-combined-image-sampler
+						   1
+						   vk-shader-stage-fragment-bit
+						   (null-pointer vk-sampler)))
+	   (bindings (list->vk-descriptor-set-layout-binding-pointer-array
+		      (list uniform-buffer-binding texture-sampler-binding)))
 	   (info (make-vk-descriptor-set-layout-create-info
 		  descriptor-set-layout-create-info
 		  0
 		  0
-		  1
-		  binding))
+		  (array-pointer-length bindings)
+		  (array-pointer-raw-ptr bindings)))
 	   (layout (make-foreign-object vk-descriptor-set-layout)))
       (vk-create-descriptor-set-layout device info 0 layout)
       layout)))
@@ -399,14 +420,14 @@
 (define device (vulkan-state-device vs))
 (define swapchain-details (vulkan-state-swapchain vs))
 
-(define vertices (list (make-vertex-input '#2( -0.5 -0.5) '#3(1.0 0.0 0.0))
-		       (make-vertex-input '#2( 0.5  -0.5) '#3(0.0 1.0 0.0))
-		       (make-vertex-input '#2( 0.5   0.5) '#3(0.0 0.0 1.0))
-		       (make-vertex-input '#2(-0.5   0.5) '#3(1.0 1.0 1.0))))
+(define vertices (list (make-vertex-input '#2( -0.5 -0.5) '#3(1.0 0.0 0.0) '#2(1.0 0.0))
+		       (make-vertex-input '#2( 0.5  -0.5) '#3(0.0 1.0 0.0) '#2(0.0 0.0))
+		       (make-vertex-input '#2( 0.5   0.5) '#3(0.0 0.0 1.0) '#2(0.0 1.0))
+		       (make-vertex-input '#2(-0.5   0.5) '#3(1.0 1.0 1.0) '#2(1.0 1.0))))
 
 (define indices (list 0 1 2 2 3 0))
 
-(define stride 20)
+(define stride 28)
 
 (define shaders (make-shaders "shaders/shader.vert" "shaders/shader.frag"))
 

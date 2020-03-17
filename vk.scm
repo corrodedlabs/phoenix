@@ -55,8 +55,8 @@
 (define vs (setup-vulkan))
 (load "vulkan/pipeline.scm")
 (load "vulkan/images.scm")
-(load "vulkan/buffers.scm")
 (load "vulkan/texture.scm")
+(load "vulkan/buffers.scm")
 
 ;; (start-frame-capture)
 

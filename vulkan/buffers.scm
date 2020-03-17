@@ -409,19 +409,24 @@
 
 (define create-descriptor-pool
   (lambda (device descriptor-count)
-    (let* ((pool-size (make-vk-descriptor-pool-size vk-descriptor-type-uniform-buffer
-						    descriptor-count))
+    (let* ((uniform-buffer-pool-size (make-vk-descriptor-pool-size vk-descriptor-type-uniform-buffer
+								   descriptor-count))
+	   (image-sampler-pool-size
+	    (make-vk-descriptor-pool-size vk-descriptor-type-combined-image-sampler
+					  descriptor-count))
+	   (pool-size-ptr (list->vk-descriptor-pool-size-pointer-array
+			   (list uniform-buffer-pool-size image-sampler-pool-size)))
 	   (info (make-vk-descriptor-pool-create-info descriptor-pool-create-info 0 0
 						      descriptor-count
-						      1
-						      pool-size))
+						      (array-pointer-length pool-size-ptr)
+						      (array-pointer-raw-ptr pool-size-ptr)))
 	   (pool (make-foreign-object vk-descriptor-pool)))
       (vk-create-descriptor-pool device info 0 pool)
       pool)))
 
 
 (define create-descriptor-sets
-  (lambda (device descriptor-pool descriptor-layout uniform-buffers)
+  (lambda (device descriptor-pool descriptor-layout uniform-buffers texture-data)
 
     (define num-sets (length uniform-buffers))
 
@@ -450,7 +455,12 @@
 		     (make-vk-descriptor-buffer-info (pointer-ref-value uniform-buffer)
 						     0
 						     ubo-size))
-		    (write
+		    (image-info
+		     (make-vk-descriptor-image-info
+		      (pointer-ref-value (texture-data-sampler texture-data))
+		      (pointer-ref-value (texture-data-image-view texture-data))
+		      vk-image-layout-shader-read-only-optimal))
+		    (uniform-buffer-write
 		     (make-vk-write-descriptor-set write-descriptor-set
 						   0
 						   (pointer-ref-value descriptor-set)
@@ -460,8 +470,26 @@
 						   vk-descriptor-type-uniform-buffer
 						   (null-pointer vk-descriptor-image-info)
 						   buffer-info
-						   (null-pointer vk-buffer-view))))
-	       (vk-update-descriptor-sets device 1 write 0 0)
+						   (null-pointer vk-buffer-view)))
+		    (combined-image-sampler-write
+		     (make-vk-write-descriptor-set write-descriptor-set
+						   0
+						   (pointer-ref-value descriptor-set)
+						   1
+						   0
+						   1
+						   vk-descriptor-type-combined-image-sampler
+						   image-info
+						   (null-pointer vk-descriptor-buffer-info)
+						   (null-pointer vk-buffer-view)))
+		    (write
+		     (list->vk-write-descriptor-set-pointer-array
+		      (list uniform-buffer-write combined-image-sampler-write))))
+	       (vk-update-descriptor-sets device
+					  (array-pointer-length write)
+					  (array-pointer-raw-ptr write)
+					  0
+					  0)
 	       descriptor-set))
 	   (map buffer-handle uniform-buffers)
 	   (vk-descriptor-set-pointer-map (lambda (x) x) descriptor-sets)))))
@@ -534,10 +562,14 @@
 (define descriptor-layout (pipeline-descriptor-set-layout pipeline))
 (define num-sets (length uniform-buffers))
 
+(define texture-data (create-texture-data physical-device device command-pool graphics-queue
+					  swapchain))
+
 (define sets (create-descriptor-sets device
 				     descriptor-pool
 				     descriptor-layout
-				     uniform-buffers))
+				     uniform-buffers
+				     texture-data))
 
 ;; (define depth-buffer-image
 ;;   (create-depth-buffer-image physical-device device command-pool graphics-queue swapchain))
