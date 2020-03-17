@@ -241,6 +241,13 @@
 ;; record to represent an image in a gpu
 (define-record-type gpu-image (fields handle view memory))
 
+(define find-depth-format
+  (lambda (physical-device)
+    (find-supported-formats physical-device
+			    candidate-formats
+			    vk-image-tiling-optimal
+			    vk-format-feature-depth-stencil-attachment-bit)))
+
 (define create-depth-buffer-image
   (lambda (physical-device device command-pool graphics-queue swapchain)
 
@@ -257,15 +264,11 @@
 				   vk-image-layout-undefined
 				   vk-image-layout-depth-stencil-attachment-optimal)
 	  (make-gpu-image image-handle
-			  memory
-			  (create-image-view device image-handle property)))))
+			  (create-image-view device image-handle property)
+			  memory))))
     
     (let* ((extent (swapchain-extent swapchain))
-	   (supported-format
-	    (find-supported-formats physical-device
-				    candidate-formats
-				    vk-image-tiling-optimal
-				    vk-format-feature-depth-stencil-attachment-bit))
+	   (supported-format (find-depth-format physical-device))
 	   (depth-property (create-depth-property extent supported-format)))
       (create-gpu-image depth-property))))
 

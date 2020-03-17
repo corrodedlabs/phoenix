@@ -3,23 +3,30 @@
 
 ;; returns a list of framebuffers created for each of the swapchain image views
 (define create-framebuffers
-  (lambda (device swapchain pipeline)
+  (lambda (physical-device device command-pool graphics-queue swapchain pipeline)
 
-    (define (framebuffer-info swapchain-image-view)
-      (make-vk-frame-buffer-create-info framebuffer-create-info 0 0
-					(pointer-ref-value (pipeline-render-pass pipeline))
-					1
-					swapchain-image-view
-					(vk-extent-2d-width (swapchain-extent swapchain))
-					(vk-extent-2d-height (swapchain-extent swapchain))
-					1))
+    (define (framebuffer-info . image-views)
+      (let ((views (list->vk-image-view-pointer-array image-views)))
+	(displayln "views" views)
+	(make-vk-frame-buffer-create-info framebuffer-create-info 0 0
+					  (pointer-ref-value (pipeline-render-pass pipeline))
+					  (array-pointer-length views)
+					  (array-pointer-raw-ptr views)
+					  (vk-extent-2d-width (swapchain-extent swapchain))
+					  (vk-extent-2d-height (swapchain-extent swapchain))
+					  1)))
     
-    (map (lambda (image-view)
-	   (let ((info (framebuffer-info image-view))
-		 (framebuffer (make-foreign-object vk-frame-buffer)))
-	     (vk-create-framebuffer device info 0 framebuffer)
-	     framebuffer))
-	 (swapchain-image-views swapchain))))
+    (let ((depth-image-view (create-depth-buffer-image physical-device
+						       device
+						       command-pool
+						       graphics-queue
+						       swapchain)))
+      (map (lambda (image-view)
+	     (let ((info (framebuffer-info image-view (gpu-image-view depth-image-view)))
+		   (framebuffer (make-foreign-object vk-frame-buffer)))
+	       (vk-create-framebuffer device info 0 framebuffer)
+	       framebuffer))
+	   (swapchain-image-views swapchain)))))
 
 
 ;; Command pool
@@ -127,8 +134,7 @@
 	(let ((clear-values clear-values)
 	      (depth-clear (cons 1.0 0)))
 	  (list->vk-clear-value-pointer-array (list (make-vk-clear-value clear-values)
-						    ;; (make-vk-clear-value depth-clear)
-						    )))))
+						    (make-vk-clear-value depth-clear))))))
 
     (define perform-render-pass
       (lambda (cmd-buffer framebuffer descriptor-set vertex-buffer index-buffer render-area clear-values)
@@ -539,7 +545,8 @@
 
 (define image-view (car image-views))
 
-(define framebuffers (create-framebuffers device swapchain-details pipeline))
+(define framebuffers (create-framebuffers physical-device device command-pool
+					  graphics-queue swapchain-details pipeline ))
 (displayln "framebuffers created " framebuffers)
 
 (define swapchain (vulkan-state-swapchain vs))

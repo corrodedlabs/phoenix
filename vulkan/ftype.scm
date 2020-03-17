@@ -586,6 +586,7 @@
    (sub-resource-range . vk-image-subresource-range)))
 
 (define-ftype vk-image-view uptr)
+(define-collection-lambdas vk-image-view)
 
 (define-vulkan-command vkCreateImageView
   ((& vk-device) (* vk-image-view-create-info) uptr (* vk-image-view)))
@@ -774,8 +775,8 @@
    (depth-compare-op . vk-compare-op)
    (depth-bounds-test-enable . vk-bool32)
    (stencil-test-enable . vk-bool32)
-   (front . vk-stencil-op-state)
-   (back . vk-stencil-op-state)
+   (front . uptr)
+   (back . uptr)
    (min-depth-bounds . float)
    (max-depth-bounds . float)))
 
@@ -905,11 +906,11 @@
 (define-enum-ftype vk-attachment-load-op
   vk-attachment-load-op-load
   vk-attachment-load-op-clear
-  vk-attachment-load-dont-care)
+  vk-attachment-load-op-dont-care)
 
 (define-enum-ftype vk-attachment-store-op
   vk-attachment-store-op-store
-  vk-attachment-store-dont-care)
+  vk-attachment-store-op-dont-care)
 
 (define-foreign-struct vk-attachment-description
   ((flags . flags)
@@ -921,6 +922,8 @@
    (stencil-store-op . vk-attachment-store-op)
    (initial-layout . vk-image-layout)
    (final-layout . vk-image-layout)))
+
+(define-collection-lambdas vk-attachment-description)
 
 (define-foreign-struct vk-attachment-reference
   ((attachment . unsigned-32)

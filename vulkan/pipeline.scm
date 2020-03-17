@@ -283,7 +283,7 @@
 ;; render pass
 
 (define create-render-pass
-  (lambda (device swapchain)
+  (lambda (physical-device device swapchain)
 
     ;; defined as (~0U)
     (define vk-subpass-external 0)
@@ -299,14 +299,32 @@
 						vk-sample-count-1-bit ;; samples
 						vk-attachment-load-op-clear ;; load-op
 						vk-attachment-store-op-store ;; store-op
-						vk-attachment-load-dont-care ;;stencil-load-op
-						vk-attachment-store-dont-care
+						vk-attachment-load-op-dont-care ;;stencil-load-op
+						vk-attachment-store-op-dont-care
 						vk-image-layout-undefined
 						vk-image-layout-present-src-khr))
 	       
 	       (color-attachment-ref
 		(make-vk-attachment-reference 0
 					      vk-image-layout-color-attachment-optimal))
+
+	       (depth-attachment
+		(make-vk-attachment-description 0
+						(find-depth-format physical-device)
+						vk-sample-count-1-bit
+						vk-attachment-load-op-clear
+						vk-attachment-store-op-dont-care
+						vk-attachment-load-op-dont-care
+						vk-attachment-store-op-dont-care
+						vk-image-layout-undefined
+						vk-image-layout-depth-stencil-attachment-optimal))
+
+	       (depth-attachment-ref
+		(make-vk-attachment-reference 1
+					      vk-image-layout-depth-stencil-attachment-optimal))
+
+	       (attachments (list->vk-attachment-description-pointer-array
+			     (list color-attachment depth-attachment)))
 	       
 	       (subpass
 		(make-vk-subpass-description 0
@@ -316,7 +334,7 @@
 					     1
 					     color-attachment-ref
 					     (null-pointer vk-attachment-reference)
-					     (null-pointer vk-attachment-reference)
+					     depth-attachment-ref
 					     0
 					     (null-pointer unsigned-32)))
 	       
@@ -332,8 +350,8 @@
 					    0)))
 	  
 	  (make-vk-render-pass-create-info render-pass-create-info 0 0
-					   1
-					   color-attachment
+					   (array-pointer-length attachments)
+					   (array-pointer-raw-ptr attachments)
 					   1
 					   subpass
 					   1
@@ -348,9 +366,23 @@
 (define-record-type pipeline
   (fields handle layout render-pass descriptor-set-layout))
 
+(define create-depth-stencil-state
+  (lambda ()
+    (make-vk-pipeline-depth-stencil-state-create-info pipeline-depth-stencil-state-create-info
+						      0
+						      0
+						      vk-true
+						      vk-true
+						      vk-compare-op-less
+						      vk-false
+						      vk-false
+						      0
+						      0
+						      0.0
+						      1.0)))
 
 (define create-graphics-pipeline
-  (lambda (device swapchain pipeline-data)
+  (lambda (physical-device device swapchain pipeline-data)
     (let* ((shaders (pipeline-data-shaders pipeline-data))
 
 	   (shader-stages (list->vk-pipeline-shader-stage-create-info-pointer-array
@@ -360,7 +392,7 @@
 
 	   (vertex-input-data (pipeline-data-vertex-input-details pipeline-data))
 
-	   (render-pass (create-render-pass device swapchain))
+	   (render-pass (create-render-pass physical-device device swapchain))
 
 	   (layout (create-pipeline-layout device))
 
@@ -393,7 +425,7 @@
 	     (create-multisampling-info)
 
 	     ;; depth stencil
-	     (null-pointer vk-pipeline-depth-stencil-state-create-info)
+	     (create-depth-stencil-state)
 	     
 	     (create-color-blending-info)
 
@@ -418,16 +450,23 @@
 ;; samplte usage
 
 (define device (vulkan-state-device vs))
+(define physical-device (vulkan-state-physical-device vs))
 (define swapchain-details (vulkan-state-swapchain vs))
 
-(define vertices (list (make-vertex-input '#2( -0.5 -0.5) '#3(1.0 0.0 0.0) '#2(1.0 0.0))
-		       (make-vertex-input '#2( 0.5  -0.5) '#3(0.0 1.0 0.0) '#2(0.0 0.0))
-		       (make-vertex-input '#2( 0.5   0.5) '#3(0.0 0.0 1.0) '#2(0.0 1.0))
-		       (make-vertex-input '#2(-0.5   0.5) '#3(1.0 1.0 1.0) '#2(1.0 1.0))))
+(define vertices (list (make-vertex-input '#3( -0.5 -0.5 0.0) '#3(1.0 0.0 0.0) '#2(1.0 0.0))
+		       (make-vertex-input '#3( 0.5  -0.5 0.0) '#3(0.0 1.0 0.0) '#2(0.0 0.0))
+		       (make-vertex-input '#3( 0.5   0.5 0.0) '#3(0.0 0.0 1.0) '#2(0.0 1.0))
+		       (make-vertex-input '#3(-0.5   0.5 0.0) '#3(1.0 1.0 1.0) '#2(1.0 1.0))
 
-(define indices (list 0 1 2 2 3 0))
+		       (make-vertex-input '#3( -0.5 -0.5 -0.5) '#3(1.0 0.0 0.0) '#2(1.0 0.0))
+		       (make-vertex-input '#3( 0.5  -0.5 -0.5) '#3(0.0 1.0 0.0) '#2(0.0 0.0))
+		       (make-vertex-input '#3( 0.5   0.5 -0.5) '#3(0.0 0.0 1.0) '#2(0.0 1.0))
+		       (make-vertex-input '#3(-0.5   0.5 -0.5) '#3(1.0 1.0 1.0) '#2(1.0 1.0))))
 
-(define stride 28)
+(define indices (list 0 1 2 2 3 0
+		      4 5 6 6 7 4))
+
+(define stride 32)
 
 (define shaders (make-shaders "shaders/shader.vert" "shaders/shader.frag"))
 
@@ -438,7 +477,7 @@
 						 (vertex-input->attrs (car vertices)))))
 
 (define pipeline
-  (create-graphics-pipeline device swapchain-details pipeline-data))
+  (create-graphics-pipeline physical-device device swapchain-details pipeline-data))
 #!eof
 
 =========================================================================================

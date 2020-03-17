@@ -53,8 +53,8 @@
 			 swapchain-details))))
 
 (define vs (setup-vulkan))
-(load "vulkan/pipeline.scm")
 (load "vulkan/images.scm")
+(load "vulkan/pipeline.scm")
 (load "vulkan/texture.scm")
 (load "vulkan/buffers.scm")
 
