@@ -38,6 +38,9 @@
 
   (define memcpy
     (foreign-procedure "memcpy" (uptr uptr size_t) void))
+
+  (define calloc
+    (foreign-procedure "calloc"))
   
   (define-condition-type &ffi-condition &condition
     ffi-condition ffi-condition?

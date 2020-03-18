@@ -308,7 +308,7 @@
   (lambda (data)
     (cond
      ((heap-data? data) (heap-data-size data))
-     ((vertex-input? (car data)) (sizeof-vertex-input-arr data))
+     ((vertex-input? (car data)) (sizeof-vertex-input data))
      ((number? (car data)) (* 4 (length data))))))
 
 ;; convert scheme values to c pointers representing those values
@@ -324,7 +324,16 @@
 			(let ((ptr (make-foreign-object float)))
 			  (ftype-set! float () ptr value)
 			  ptr)) 
-		      (vertices->list data))))
+		      (let lp ((v (vector->list (vertex-input->vector data)))
+			       (flat-coll (list)))
+			(cond
+			 ((null? v) flat-coll)
+			 (else (lp (cdr v)
+				   (append flat-coll
+					   (apply append
+						  (vector->list
+						   (vector-map (lambda (_ v) (vector->list v))
+							       (car v))))))))))))
 
        ((inexact? (car data))
 	(list->float-pointer-array
@@ -512,8 +521,8 @@
 (define queue-index (vulkan-state-queue-index vs))
 (define command-pool (create-command-pool device queue-index))
 
-(define size (fold-left + 0 (map vertex-input-total-size vertices)))
-(define buffer-ptr (create-new-buffer device size host-local))
+;; (define size (fold-left + 0 (map vertex-input-total-size vertices)))
+;; (define buffer-ptr (create-new-buffer device size host-local))
 
 ;; (define memory (allocate-memory buffer-ptr))
 

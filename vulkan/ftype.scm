@@ -775,8 +775,8 @@
    (depth-compare-op . vk-compare-op)
    (depth-bounds-test-enable . vk-bool32)
    (stencil-test-enable . vk-bool32)
-   (front . uptr)
-   (back . uptr)
+   (front . vk-stencil-op-state)
+   (back . vk-stencil-op-state)
    (min-depth-bounds . float)
    (max-depth-bounds . float)))
 
