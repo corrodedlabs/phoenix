@@ -8,6 +8,7 @@
 (import (prelude)
 
 	(ffi)
+	(assimp)
 	(glfw)
 	(shaderc)
 	(camera)

@@ -497,10 +497,11 @@
 	   ;; this is used to generate the ftype-ref! calls
 	   (let ((member-details (filter identity
 					 (map (lambda (type)
+						(display "type") (display type) (newline)
 						(let ((members (and (identifier? type)
-								  (member type scalar-type)
+								  (not (member (syntax->datum type)
+									     scalar-type))
 								  (lookup type #'struct-info))))
-						  (display "members") (display members) (newline)
 						  (cond
 						   (members
 						    (cons (syntax->datum type) members))
