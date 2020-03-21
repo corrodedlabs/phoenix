@@ -532,7 +532,7 @@
   (create-gpu-local-buffer physical-device
 			   device
 			   graphics-queue
-			   (vertex-input-metadata-flat-list vertex-input-metadata)
+			   (vertex-input-metadata-vertices-list vertex-input-metadata)
 			   vk-buffer-usage-vertex-buffer-bit))
 
 (displayln "vertex buffer done" vertex-buffer)

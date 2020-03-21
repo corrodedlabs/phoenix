@@ -37,10 +37,30 @@
 
 ;; vertex input
 
-(define-record-type vertex-input-metadata (fields size vector stride indices flat-list))
+(define-record-type vertex-input-metadata (fields size vertices-list stride indices attrs))
 
 ;; default vertex input struct
 (define-record-type vertex-input (fields position color texture-coord))
+
+;; takes input a nested list and returns a list of cons cell (format . offset)
+;; these are usually saved in the field attrs of vertex-input-metadata
+(define vector->attr
+  (lambda (input)
+    (let lp ((elems input)
+	     (offset 0)
+	     (attrs (list)))
+      
+      (cond
+       ((null? elems) (reverse attrs))
+       (else
+	(case (vector-length (car elems))
+	  ((2) (lp (cdr elems)
+		   (fx+ offset (* 2 4))
+		   (cons (cons vk-format-r32g32-sfloat offset) attrs)))
+	  ((3) (lp (cdr elems)
+		   (fx+ offset (* 3 4))
+		   (cons (cons vk-format-r32g32b32-sfloat offset) attrs)))
+	  (else (error "unsupported vector" v))))))))
 
 (define create-vertex-input-metadata
   (lambda (vertices-list indices-list)
@@ -59,53 +79,34 @@
     (define (sizeof-vertex-input arr)
       (fold-left + 0 (map vertex-input-total-size arr)))
 
-    (define vertex-input->vectors
+    (define vertex-input->list
       (lambda (vertices)
-	(let ((vector-repr (list->vector (map (lambda (v)
-						(match v
-						  (($ vertex-input pos color tex-coord)
-						   (list->vector (list pos color tex-coord)))))
-					      vertices))))
-	  (cons vector-repr
-		(let lp ((v (vector->list vector-repr))
-			 (flat-coll (list)))
-		  (cond
-		   ((null? v) flat-coll)
-		   (else (lp (cdr v)
-			     (append flat-coll
-				     (apply append
-					    (vector->list
-					     (vector-map (lambda (_ v) (vector->list v))
-							 (car v)))))))))))))
+	(let ((vertices-list (map (lambda (v)
+				    (match v
+				      (($ vertex-input pos color tex-coord)
+				       (list pos color tex-coord))))
+				  vertices)))
+	  (let lp ((v vertices-list)
+		   (flat-coll (list)))
+	    (displayln "v" v)
+	    (cond
+	     ((null? v) flat-coll)
+	     (else (lp (cdr v)
+		       (append flat-coll (apply append
+						(map (lambda (v) (vector->list v))
+						     (car v)))))))))))
 
     (define vertex-input-stride
       (lambda (vertices)
 	(fx* 4 (vertex-input-total-length (car vertices)))))
 
-    (match (vertex-input->vectors vertices-list)
-      ((vector . flat-list)
-       (make-vertex-input-metadata (sizeof-vertex-input vertices-list)
-				   vector
-				   (vertex-input-stride vertices-list)
-				   indices-list
-				   flat-list)))))
-
-(define vector->attr
-  (lambda (input)
-    (let lp ((elems (vector->list input))
-	     (offset 0)
-	     (attrs (list)))
-      (cond
-       ((null? elems) (reverse attrs))
-       (else
-	(case (vector-length (car elems))
-	  ((2) (lp (cdr elems)
-		   (fx+ offset (* 2 4))
-		   (cons (cons vk-format-r32g32-sfloat offset) attrs)))
-	  ((3) (lp (cdr elems)
-		   (fx+ offset (* 3 4))
-		   (cons (cons vk-format-r32g32b32-sfloat offset) attrs)))
-	  (else (error "unsupported vector" v))))))))
+    (make-vertex-input-metadata (sizeof-vertex-input vertices-list)
+				(vertex-input->list vertices-list)
+				(vertex-input-stride vertices-list)
+				indices-list
+				(match (car vertices-list)
+				  (($ vertex-input pos color tex-coord)
+				   (vector->attr (list pos color tex-coord)))))))
 
 
 ;; setup vertex input descriptors
@@ -275,8 +276,8 @@
 (define vertex-input->details
   (lambda (input-metadata)
     (match input-metadata
-      ((@ vertex-input-metadata (vector v) (stride s))
-       (make-vertex-input-details v s (vector->attr (vector-ref v 0)))))))
+      ((@ vertex-input-metadata (vertices-list v) (stride s) (attrs a))
+       (make-vertex-input-details v s a)))))
 
 ;; render pass
 
@@ -412,12 +413,10 @@
 	     (create-pipeline-assembly-state)
 
 	     ;; tesselation
-	     (null-pointer
-	      vk-pipeline-tessellation-state-create-info)
+	     (null-pointer vk-pipeline-tessellation-state-create-info)
 
 	     ;; viewport
-	     (create-viewport-info
-	      (swapchain-extent swapchain))
+	     (create-viewport-info (swapchain-extent swapchain))
 
 	     ;; rasterizer
 	     (create-rasterizer-info)
