@@ -308,8 +308,9 @@
   (lambda (data)
     (cond
      ((heap-data? data) (heap-data-size data))
-     ((vertex-input? (car data)) (sizeof-vertex-input data))
-     ((number? (car data)) (* 4 (length data))))))
+     ;; ((vertex-input? (car data)) (sizeof-vertex-input data))
+     ((number? (car data)) (* 4 (length data)))
+     (else (error "unsupported scheme data" data)))))
 
 ;; convert scheme values to c pointers representing those values
 (define scheme-data->c-pointer
@@ -317,23 +318,14 @@
     (ftype-pointer-address
      (array-pointer-raw-ptr
       (cond
-       ((vertex-input? (car data))
-	(list->float-pointer-array
-	 (map-indexed (lambda (value i)
-			(displayln "setting value" value)
-			(let ((ptr (make-foreign-object float)))
-			  (ftype-set! float () ptr value)
-			  ptr)) 
-		      (let lp ((v (vector->list (vertex-input->vector data)))
-			       (flat-coll (list)))
-			(cond
-			 ((null? v) flat-coll)
-			 (else (lp (cdr v)
-				   (append flat-coll
-					   (apply append
-						  (vector->list
-						   (vector-map (lambda (_ v) (vector->list v))
-							       (car v))))))))))))
+       ;; ((vertex-input? (car data))
+       ;; 	(list->float-pointer-array
+       ;; 	 (map-indexed (lambda (value i)
+       ;; 			(displayln "setting value" value)
+       ;; 			(let ((ptr (make-foreign-object float)))
+       ;; 			  (ftype-set! float () ptr value)
+       ;; 			  ptr)) 
+       ;; 		      )))
 
        ((inexact? (car data))
 	(list->float-pointer-array
@@ -536,19 +528,21 @@
 
 (display "creating buffers") (newline)
 
-(define vertex-buffer (create-gpu-local-buffer physical-device
-					       device
-					       graphics-queue
-					       vertices
-					       vk-buffer-usage-vertex-buffer-bit))
+(define vertex-buffer
+  (create-gpu-local-buffer physical-device
+			   device
+			   graphics-queue
+			   (vertex-input-metadata-flat-list vertex-input-metadata)
+			   vk-buffer-usage-vertex-buffer-bit))
 
 (displayln "vertex buffer done" vertex-buffer)
 
-(define index-buffer (create-gpu-local-buffer physical-device
-					      device
-					      graphics-queue
-					      indices
-					      vk-buffer-usage-index-buffer-bit))
+(define index-buffer
+  (create-gpu-local-buffer physical-device
+			   device
+			   graphics-queue
+			   (vertex-input-metadata-indices vertex-input-metadata)
+			   vk-buffer-usage-index-buffer-bit))
 
 (displayln "index buffer created" index-buffer)
 

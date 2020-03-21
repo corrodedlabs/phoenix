@@ -35,43 +35,60 @@
 (define displayln
   (lambda (tag x) (display tag) (display ":") (display x) (newline)))
 
-;; vertex input 
+;; vertex input
 
-;; Interface that defines the vertex input
-;; any module that satisfies this can be used as an input for vertex shaders
+(define-record-type vertex-input-metadata (fields size vector stride indices flat-list))
 
-(define-interface vertex-input-interface (vertex-input?
-					  sizeof-vertex-input
-					  vertex-input->vector
-					  vertex-input-stride
-					  make-vertex-input))
+;; default vertex input struct
+(define-record-type vertex-input (fields position color texture-coord))
 
-(define-module default-vertex-input vertex-input-interface
-  (define-record-type vertex-input (fields position color texture-coord))
+(define create-vertex-input-metadata
+  (lambda (vertices-list indices-list)
+    
+    (define vertex-input-total-length
+      (lambda (input)
+	(fx+ (vector-length (vertex-input-position input))
+	     (vector-length (vertex-input-color input))
+	     (vector-length (vertex-input-texture-coord input)))))
 
-  (define vertex-input-total-length
-    (lambda (input)
-      (fx+ (vector-length (vertex-input-position input))
-	   (vector-length (vertex-input-color input))
-	   (vector-length (vertex-input-texture-coord input)))))
-
-  ;; assuming that we are using float for everything
-  (define vertex-input-total-size
-    (lambda (input) (fx* 4 (vertex-input-total-length input))))
+    ;; assuming that we are using float for everything
+    (define vertex-input-total-size
+      (lambda (input) (fx* 4 (vertex-input-total-length input))))
 
 
-  (define (sizeof-vertex-input arr)
-    (fold-left + 0 (map vertex-input-total-size arr)))
+    (define (sizeof-vertex-input arr)
+      (fold-left + 0 (map vertex-input-total-size arr)))
 
-  (define vertex-input->vector
-    (lambda (vertices)
-      (list->vector (map (lambda (v)
-			   (match v
-			     (($ vertex-input pos color tex-coord)
-			      (list->vector (list pos color tex-coord)))))
-			 vertices))))
+    (define vertex-input->vectors
+      (lambda (vertices)
+	(let ((vector-repr (list->vector (map (lambda (v)
+						(match v
+						  (($ vertex-input pos color tex-coord)
+						   (list->vector (list pos color tex-coord)))))
+					      vertices))))
+	  (cons vector-repr
+		(let lp ((v (vector->list vector-repr))
+			 (flat-coll (list)))
+		  (cond
+		   ((null? v) flat-coll)
+		   (else (lp (cdr v)
+			     (append flat-coll
+				     (apply append
+					    (vector->list
+					     (vector-map (lambda (_ v) (vector->list v))
+							 (car v)))))))))))))
 
-  (define vertex-input-stride 32))
+    (define vertex-input-stride
+      (lambda (vertices)
+	(fx* 4 (vertex-input-total-length (car vertices)))))
+
+    (match (vertex-input->vectors vertices-list)
+      ((vector . flat-list)
+       (make-vertex-input-metadata (sizeof-vertex-input vertices-list)
+				   vector
+				   (vertex-input-stride vertices-list)
+				   indices-list
+				   flat-list)))))
 
 (define vector->attr
   (lambda (input)
@@ -223,12 +240,11 @@
 						   (null-pointer vk-sampler)))
 	   (bindings (list->vk-descriptor-set-layout-binding-pointer-array
 		      (list uniform-buffer-binding texture-sampler-binding)))
-	   (info (make-vk-descriptor-set-layout-create-info
-		  descriptor-set-layout-create-info
-		  0
-		  0
-		  (array-pointer-length bindings)
-		  (array-pointer-raw-ptr bindings)))
+ 	   (info (make-vk-descriptor-set-layout-create-info descriptor-set-layout-create-info
+							    0
+							    0
+							    (array-pointer-length bindings)
+							    (array-pointer-raw-ptr bindings)))
 	   (layout (make-foreign-object vk-descriptor-set-layout)))
       (vk-create-descriptor-set-layout device info 0 layout)
       layout)))
@@ -257,10 +273,10 @@
 (define-record-type pipeline-data (fields shaders vertex-input-details))
 
 (define vertex-input->details
-  (lambda (vertex-input-vector stride)
-    (make-vertex-input-details vertex-input-vector
-			       stride
-			       (vector->attr (vector-ref vertex-input-vector 0)))))
+  (lambda (input-metadata)
+    (match input-metadata
+      ((@ vertex-input-metadata (vector v) (stride s))
+       (make-vertex-input-details v s (vector->attr (vector-ref v 0)))))))
 
 ;; render pass
 
@@ -438,8 +454,6 @@
 (define physical-device (vulkan-state-physical-device vs))
 (define swapchain-details (vulkan-state-swapchain vs))
 
-(import default-vertex-input)
-
 (define vertices (list (make-vertex-input '#3( -0.5 -0.5 0.0) '#3(1.0 0.0 0.0) '#2(1.0 0.0))
 		       (make-vertex-input '#3( 0.5  -0.5 0.0) '#3(0.0 1.0 0.0) '#2(0.0 0.0))
 		       (make-vertex-input '#3( 0.5   0.5 0.0) '#3(0.0 0.0 1.0) '#2(0.0 1.0))
@@ -456,10 +470,10 @@
 (define shaders (make-shaders "shaders/shader.vert" "shaders/shader.frag"))
 
 
+(define vertex-input-metadata (create-vertex-input-metadata vertices indices))
 
 (define pipeline-data
-  (make-pipeline-data shaders (vertex-input->details (vertex-input->vector vertices)
-						     vertex-input-stride)))
+  (make-pipeline-data shaders (vertex-input->details vertex-input-metadata)))
 
 (define pipeline
   (create-graphics-pipeline physical-device device swapchain-details pipeline-data))

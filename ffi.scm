@@ -38,9 +38,6 @@
 
   (define memcpy
     (foreign-procedure "memcpy" (uptr uptr size_t) void))
-
-  (define calloc
-    (foreign-procedure "calloc"))
   
   (define-condition-type &ffi-condition &condition
     ffi-condition ffi-condition?
@@ -115,18 +112,18 @@
   (define strings->c-array
     (lambda (strs)
       (let ((ptr (unbox (malloc (* (ftype-sizeof char)
-  				   (apply +
+				   (apply +
 					  (map (lambda (s) (+ 1 (string-length s)))
 					       strs)))))))
-  	(let loop ((i 0)
-  		   (s strs))
+	(let loop ((i 0)
+		   (s strs))
 	  (write "loop daa:")
 	  (write i)
 	  (write s)
 	  (write "\n")
-  	  (cond
-  	   ((null? s) ptr)
-  	   (else (let ((len (string-length (car s))))
+	  (cond
+	   ((null? s) ptr)
+	   (else (let ((len (string-length (car s))))
 		   (string->ptr (car s) ptr i)
 		   (loop (+ i len 1) (cdr s)))))))))
 
@@ -341,9 +338,9 @@
       (define array-type?
 	(lambda (type)
 	  (and (list? type)
-	     (fx=? (length type) 3)
-	     (equal? 'array (car type))
-	     (number? (cadr type)))))
+	       (fx=? (length type) 3)
+	       (equal? 'array (car type))
+	       (number? (cadr type)))))
       
       (define construct-make-def
 	(lambda (struct-name member-spec member-details)
@@ -502,9 +499,9 @@
 					 (map (lambda (type)
 						(display "type") (display type) (newline)
 						(let ((members (and (identifier? type)
-								  (not (member (syntax->datum type)
-									     scalar-type))
-								  (lookup type #'struct-info))))
+								    (not (member (syntax->datum type)
+										 scalar-type))
+								    (lookup type #'struct-info))))
 						  (cond
 						   (members
 						    (cons (syntax->datum type) members))

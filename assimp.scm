@@ -195,7 +195,9 @@
 
 
     (define normals
-      (vector3-array-ptr->list (make-array-pointer num-vertices (mesh-normals mesh-ptr) 'vector3)))
+      (vector3-array-ptr->list (make-array-pointer num-vertices
+						   (mesh-normals mesh-ptr)
+						   'vector3)))
 
 
     ;; Texture coordinates may have multiple channels, we only use the first we find
@@ -204,7 +206,9 @@
 	      (not (ftype-pointer-null? ptr))) (mesh-texture-coords mesh-ptr)))
 
     (define texture-coords
-      (vector3-array-ptr->list (make-array-pointer num-vertices texture-coords-channel 'vector3)))
+      (vector3-array-ptr->list (make-array-pointer num-vertices
+						   texture-coords-channel
+						   'vector3)))
 
     (make-vertex-buffer-data vertices normals texture-coords #f))
 
