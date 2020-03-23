@@ -53,7 +53,9 @@
       (cond
        ((null? elems) (reverse attrs))
        (else
-	(case (vector-length (car elems))
+	(case (cond
+	       ((vector? (car elems)) (vector-length (car elems)))
+	       ((list? (car elems)) (length (car elems))))
 	  ((2) (lp (cdr elems)
 		   (fx+ offset (* 2 4))
 		   (cons (cons vk-format-r32g32-sfloat offset) attrs)))
