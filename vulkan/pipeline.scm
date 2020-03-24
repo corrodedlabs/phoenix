@@ -184,7 +184,7 @@
 						    vk-false
 						    vk-polygon-mode-fill
 						    vk-cull-mode-back-bit
-						    vk-front-face-counter-clockwise
+						    vk-front-face-clockwise
 						    vk-false
 						    0.0
 						    0.0
@@ -449,6 +449,8 @@
 				    pipeline)
       (make-pipeline pipeline (car layout) render-pass (cdr layout)))))
 
+(load "vulkan/mesh.scm")
+
 ;; samplte usage
 
 (define device (vulkan-state-device vs))
@@ -471,7 +473,7 @@
 (define shaders (make-shaders "shaders/shader.vert" "shaders/shader.frag"))
 
 
-(define vertex-input-metadata (create-vertex-input-metadata vertices indices))
+(define vertex-input-metadata (create-vertex-input-metadata "models/turret.obj"))
 
 (define pipeline-data
   (make-pipeline-data shaders (vertex-input->details vertex-input-metadata)))

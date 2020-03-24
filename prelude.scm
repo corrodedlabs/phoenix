@@ -3,6 +3,7 @@
   (export identity
 	  construct-name
 	  map-indexed
+	  take
 	  kebab-case->camel-case
 
 	  define-interface
@@ -17,12 +18,12 @@
   (define construct-name
     (lambda (template-identifier . args)
       (datum->syntax template-identifier
-		     (string->symbol (apply string-append
-					    (map (lambda (x)
-						   (if (string? x)
-						       x
-						       (symbol->string (syntax->datum x))))
-						 args))))))
+	(string->symbol (apply string-append
+			  (map (lambda (x)
+				 (if (string? x)
+				   x
+				   (symbol->string (syntax->datum x))))
+			       args))))))
 
   (define map-indexed
     (lambda (f arr)
@@ -34,6 +35,11 @@
 	 (else (lp (+ i 1)
 		   (cdr xs)
 		   (cons (f (car xs) i) coll)))))))
+
+  (define take
+    (lambda (list pos)
+      (let ((vec (list->vector list)))
+	(map (lambda (i) (vector-ref vec i)) (iota pos)))))
 
   (define kebab-case->camel-case
     (lambda (str)

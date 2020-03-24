@@ -127,7 +127,7 @@
 
 
 (define create-command-buffers
-  (lambda (device swapchain command-pool pipeline framebuffers descriptor-sets)
+  (lambda (device swapchain command-pool pipeline framebuffers descriptor-sets indices-length)
 
     (define clear-values-ptr
       (lambda ()
@@ -137,7 +137,8 @@
 						    (make-vk-clear-value depth-clear))))))
 
     (define perform-render-pass
-      (lambda (cmd-buffer framebuffer descriptor-set vertex-buffer index-buffer render-area clear-values)
+      (lambda (cmd-buffer framebuffer descriptor-set vertex-buffer index-buffer render-area
+		     clear-values)
 	(let ((info (make-vk-render-pass-begin-info (pipeline-render-pass pipeline)
 						    framebuffer
 						    render-area
@@ -173,7 +174,7 @@
 	  			       descriptor-set
 	  			       0
 	  			       (null-pointer u32))
-	  (vk-cmd-draw-indexed cmd-buffer (length indices) 1 0 0 0)
+	  (vk-cmd-draw-indexed cmd-buffer indices-length 1 0 0 0)
 	  (vk-cmd-end-render-pass cmd-buffer)
 	  cmd-buffer)))
 
@@ -364,7 +365,6 @@
 	   (memory (allocate-memory physical-device device buffer-ptr host-local)))
       (vk-bind-buffer-memory device buffer-ptr memory 0)
       (copy-data-from-scheme device memory data)
-      (displayln "ok creating a host local buffer for data" data)
       (make-buffer buffer-ptr memory size)))))
 
 ;; create high performance gpu buffer
@@ -383,7 +383,6 @@
       			(buffer-handle staging-buffer)
       			gpu-buffer-ptr
       			size)
-      (displayln "creating a gpu local buffer for data" data)
       (make-buffer gpu-buffer-ptr memory size))))
 
 
@@ -532,19 +531,19 @@
   (create-gpu-local-buffer physical-device
 			   device
 			   graphics-queue
-			   (vertex-input-metadata-vertices-list vertex-input-metadata)
+			   (vertex-input-metadata-vertices-list input-metadata)
 			   vk-buffer-usage-vertex-buffer-bit))
 
-(displayln "vertex buffer done" vertex-buffer)
+;; (displayln "vertex buffer done" vertex-buffer)
 
 (define index-buffer
   (create-gpu-local-buffer physical-device
 			   device
 			   graphics-queue
-			   (vertex-input-metadata-indices vertex-input-metadata)
+			   (vertex-input-metadata-indices input-metadata)
 			   vk-buffer-usage-index-buffer-bit))
 
-(displayln "index buffer created" index-buffer)
+;; (displayln "index buffer created" index-buffer)
 
 (define image-view (car image-views))
 
@@ -589,7 +588,13 @@
 (display "going to created cmd buffers") (newline)
 
 (define cmd-buffers
-  (create-command-buffers device swapchain command-pool pipeline framebuffers sets))
+  (create-command-buffers device
+			  swapchain
+			  command-pool
+			  pipeline
+			  framebuffers
+			  sets
+			  (length (vertex-input-metadata-indices input-metadata))))
 
 (displayln "command buffers created" cmd-buffers)
 
