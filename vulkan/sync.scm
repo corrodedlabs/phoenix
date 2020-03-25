@@ -46,7 +46,7 @@
 (define *run-draw-loop* #f)
 
 (define draw-next-frame
-  (lambda (device swapchain cmd-buffers sync-objects state)
+  (lambda (window device swapchain cmd-buffers sync-objects state)
     (display "starting draw loop") (newline)
     (let ((image-index (make-foreign-object u32))
 	  (cmd-buffers-arr (vk-command-buffer-pointer-map identity cmd-buffers))
@@ -75,7 +75,10 @@
 		(vector-set! images-in-flight (read-unsigned-32 image-index) in-flight-fence)
 		(let ((cmd-buffer (list-ref cmd-buffers-arr (read-unsigned-32 image-index)))
 		      (wait-dst-mask (make-foreign-object flags)))
-		  (ftype-set! flags () wait-dst-mask vk-pipeline-stage-color-attachment-output-bit)
+		  (ftype-set! flags
+			      ()
+			      wait-dst-mask
+			      vk-pipeline-stage-color-attachment-output-bit)
 		  (vk-reset-fences device 1 in-flight-fence)
 		  (vk-queue-submit graphics-queue
 				   1
@@ -94,7 +97,9 @@
 		  (vk-queue-present-khr present-queue
 					(make-present-info swapchain-handle
 							   finished-semaphore
-							   image-index)))
+							   image-index))
+		  (displayln "movement direction" (get-movement-direction window))
+		  (poll-events))
 		(lp (make-frame-state (mod (fx+ current-frame 1) +frames-in-flight+)
 				      images-in-flight)
 		    (+ 1 i)))))))
@@ -109,7 +114,7 @@
 
 
 (define run (lambda ()
-	      (draw-next-frame device swapchain cmd-buffers sync-objects initial-state)))
+	      (draw-next-frame window device swapchain cmd-buffers sync-objects initial-state)))
 
 (define start-loop
   (case-lambda

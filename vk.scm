@@ -63,7 +63,7 @@
 
 (load "vulkan/sync.scm")
 
-
+(define window (window-details-window (vulkan-state-window vs)))
 (start-loop)
 
 #!eof
