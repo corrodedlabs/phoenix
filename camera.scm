@@ -104,7 +104,7 @@
 		      (make-vector4 zero    zero    (/ (- (* 2 near far)) (- far near)) zero)))))
 
 
-  (define-record-type mvp-matrix (fields model view projection))
+  (define-record-type mvp-matrix (fields model view projection eye look-at-direction))
 
   (define mvp-matrix->list
     (lambda (mvp-matrix-obj)
@@ -112,26 +112,44 @@
 	(($ mvp-matrix model view projection)
 	 (apply append (map matrix->list (list model view projection)))))))
 
+  (define up (make-vector3 0.0 0.0 1.0))
+  
   (define calculate-mvp-matrix
     (lambda (screen-width screen-height)
       (let ((eye (make-vector3 2.0 2.0 2.0))
-	    (center (make-vector3 0.0 0.0 0.0))
-	    (up (make-vector3 0.0 0.0 1.0))
+	    (center (make-vector3 0.0 0.0 0.))
 	    (fovy 45)
 	    (aspect (/ screen-width screen-height))
 	    (near 0.1)
 	    (far 10.0))
 	(make-mvp-matrix (from-angle-z 90)
 			 (look-at eye center up)
-			 (perspective fovy aspect near far)))))
+			 (perspective fovy aspect near far)
+			 eye
+			 center))))
 
   (define update-mvp-matrix
     (lambda (current-matrix movement-direction)
-      (displayln "movement direction" movement-direction)
-      (displayln "current matrix" current-matrix)
+
+      (define update-view
+	(lambda (eye center)
+	  (match movement-direction
+	    (($ movement-data forward back right left)
+	     (look-at eye center up)))))
+
+      ;; camera update function
+      (define update-eye-center
+	(lambda (eye center)
+	  (cons eye center)))
+      
       (match current-matrix
-	(($ mvp-matrix model view projection)
-	 (make-mvp-matrix model view projection))
+	(($ mvp-matrix model view projection eye center)
+	 (match (update-eye-center eye center)
+	   ((eye . center)
+	    (make-mvp-matrix model
+			     (update-view eye center)
+			     projection
+			     eye center))))
 	(else (error "current matrix not valid" current-matrix))))))
 
 

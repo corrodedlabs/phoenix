@@ -5,6 +5,7 @@
 	  new-window
 	  poll-events
 	  get-movement-direction
+	  movement-data
 	  movement-data?
 	  movement-data-forward
 	  movement-data-back
