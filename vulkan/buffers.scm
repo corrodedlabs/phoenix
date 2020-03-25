@@ -402,12 +402,22 @@
 (define create-uniform-buffers
   (lambda (physical-device device data num-buffers)
     (map (lambda (i)
-	   (create-host-buffer physical-device
-			       device
-			       data
-			       vk-buffer-usage-uniform-buffer-bit))
+	   (cons (create-host-buffer physical-device
+				     device
+				     (uniform-buffer-data->list data)
+				     vk-buffer-usage-uniform-buffer-bit)
+		 data))
 	 (iota num-buffers))))
 
+(define update-uniform-buffer
+  (lambda (device uniform-buffer movement-direction)
+    (match (car uniform-buffer)
+      (($ buffer handle memory size)
+       (copy-data-from-scheme device
+			      memory
+			      (uniform-buffer-data->list
+			       (update-mvp-matrix (cdr uniform-buffer) movement-direction))))
+      (else (error "unifor buffer not valid" uniform-buffer)))))
 
 ;; Descriptor sets and pools
 
@@ -433,14 +443,9 @@
 
 (define create-descriptor-sets
   (lambda (device descriptor-pool descriptor-layout uniform-buffers texture-data)
-
-    (define num-sets (length uniform-buffers))
-
-    ;; uniform buffer  object suze
-    (define ubo-size (sizeof-scheme-data uniform-buffer-data-list))
-
+    
     (define allocate-descriptor-sets
-      (lambda ()
+      (lambda (num-sets)
 	(let* ((layouts (array-pointer-raw-ptr
 			 (list->vk-descriptor-set-layout-pointer-array
 			  (map (lambda (i) descriptor-layout) (iota num-sets)))))
@@ -454,7 +459,10 @@
 	  (vk-allocate-descriptor-sets device alloc-info set)
 	  (make-array-pointer num-sets set 'vk-descriptor-set))))
 
-    (let ((descriptor-sets  (allocate-descriptor-sets)))
+    (let ((num-sets (length uniform-buffers))
+	  ;; todo can be optimized further
+	  (ubo-size (sizeof-scheme-data (uniform-buffer-data->list (cdar uniform-buffers))))
+	  (descriptor-sets  (allocate-descriptor-sets num-sets)))
       (displayln "ubo size is" ubo-size)
       (map (lambda (uniform-buffer descriptor-set)
 	     (let* ((buffer-info
@@ -497,7 +505,7 @@
 					  0
 					  0)
 	       descriptor-set))
-	   (map buffer-handle uniform-buffers)
+	   (map (lambda (buf) (buffer-handle (car buf)))  uniform-buffers)
 	   (vk-descriptor-set-pointer-map (lambda (x) x) descriptor-sets)))))
 
 
@@ -554,14 +562,12 @@
 (define swapchain (vulkan-state-swapchain vs))
 (define extent (swapchain-extent (vulkan-state-swapchain vs)))
 
-(define uniform-buffer-data-list
-  (uniform-buffer-data->list (extent->uniform-buffer-data extent)))
+(define uniform-buffer-data (extent->uniform-buffer-data extent))
 
-(define uniform-buffers
-  (create-uniform-buffers physical-device
-			  device
-			  uniform-buffer-data-list
-			  (length framebuffers)))
+(define uniform-buffers (create-uniform-buffers physical-device
+						device
+						uniform-buffer-data
+						(length framebuffers)))
 
 (define descriptor-count (length uniform-buffers))
 

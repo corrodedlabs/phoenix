@@ -2,10 +2,12 @@
   ;; exporting function necessary to provide a view into the world created
   ;; this data will be used by the uniform buffer
   (export calculate-mvp-matrix
+	  update-mvp-matrix
 	  mvp-matrix->list)
 
   (import (except (scheme) vector->list)
-	  (matchable))
+	  (matchable)
+	  (prelude))
 
   (define-record-type point3 (fields x y z))
   (define-record-type vector3 (fields x y z))
@@ -121,7 +123,16 @@
 	    (far 10.0))
 	(make-mvp-matrix (from-angle-z 90)
 			 (look-at eye center up)
-			 (perspective fovy aspect near far))))))
+			 (perspective fovy aspect near far)))))
+
+  (define update-mvp-matrix
+    (lambda (current-matrix movement-direction)
+      (displayln "movement direction" movement-direction)
+      (displayln "current matrix" current-matrix)
+      (match current-matrix
+	(($ mvp-matrix model view projection)
+	 (make-mvp-matrix model view projection))
+	(else (error "current matrix not valid" current-matrix))))))
 
 
 #|

@@ -2,6 +2,7 @@
   
   (export identity
 	  construct-name
+	  displayln
 	  map-indexed
 	  take
 	  kebab-case->camel-case
@@ -97,6 +98,9 @@
     (syntax-rules ()
       [(_ name interface defn ...)
        (interface name (defn ...))]))
+
+  (define (displayln . args)
+    (map (lambda (a) (display a) (newline)) args))
 
   ;; Within an abstract-module form, each of the exports in the list ex ... must be
   ;; variables.
