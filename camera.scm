@@ -3,7 +3,8 @@
   ;; this data will be used by the uniform buffer
   (export calculate-mvp-matrix
 	  update-mvp-matrix
-	  mvp-matrix->list)
+	  mvp-matrix->list
+	  make-vector3)
 
   (import (except (scheme) vector->list)
 	  (matchable)
@@ -43,7 +44,15 @@
 		      (make-vector4  zero zero   1.0 zero)
 		      (make-vector4  zero zero  zero  1.0)))))
 
-  (define vector-
+  (define vector3+
+    (lambda (vec1 vec2)
+      (match vec1
+	(($ vector3 x1 y1 z1)
+	 (match vec2
+	   (($ vector3 x2 y2 z2)
+	    (make-vector3 (+ x1 x2) (+ y1 y2) (+ z1 z2))))))))
+
+  (define vector3-
     (lambda (p1 p2)
       (make-vector3 (- (vector3-x p1) (vector3-x p2))
 		    (- (vector3-y p1) (vector3-y p2))
@@ -81,7 +90,8 @@
 
   (define look-at
     (lambda (eye center up)
-      (let* ((look-at-direction (vector- center eye))
+      (displayln "look at" eye center up)
+      (let* ((look-at-direction (vector3- center eye))
 	     (f (normalize look-at-direction))
 	     (s (normalize (cross f up)))
 	     (u (cross s f)))
@@ -128,28 +138,58 @@
 			 eye
 			 center))))
 
-  (define update-mvp-matrix
-    (lambda (current-matrix movement-direction)
+  (define-syntax forward (identifier-syntax 'forward))
+  (define-syntax back (identifier-syntax 'back))
+  (define-syntax right (identifier-syntax 'right))
+  (define-syntax left (identifier-syntax 'left))
 
-      (define update-view
-	(lambda (eye center)
-	  (match movement-direction
-	    (($ movement-data forward back right left)
-	     (look-at eye center up)))))
+  (define *speed* 2)
+  (define t0 (current-time))
+
+  (define update-mvp-matrix
+    (lambda (current-matrix eye-position movement-direction)
+
+      (define update-view (lambda (eye center) (look-at eye center up)))
+
+      (define move
+      	(lambda (direction eye)
+	  (displayln "moving in direction" direction)
+	  (let* ((t1 (current-time))
+		 (δ (* (/ (time-nanosecond (time-difference t1 t0))
+			  100000000)
+		       *speed*)))
+	    (displayln "delta is " δ)
+	    (set! t0 t1)
+	    (case direction
+	      ((forward) (vector3+ eye (make-vector3 0 0 δ)))
+	      ((back) (vector3+ eye (make-vector3 0 0 (- δ))))
+	      ((right) (vector3+ eye (make-vector3 δ 0 0)))
+	      ((left) (vector3+ eye (make-vector3 (- δ) 0 0)))
+	      (else (error "invalid direction" direction))))))
 
       ;; camera update function
       (define update-eye-center
 	(lambda (eye center)
-	  (cons eye center)))
-      
+	  (displayln "eye is at " eye)
+	  (match movement-direction
+	    (($ movement-data forward? back? right? left?)
+	     (cons (cond
+		    (forward? (move forward eye))
+		    (back? (move back eye))
+		    (right? (move right eye))
+		    (left? (move left eye))
+		    (else eye)) center))
+	    (else (error "invalid movement direction" movement-direction)))))
+
       (match current-matrix
 	(($ mvp-matrix model view projection eye center)
-	 (match (update-eye-center eye center)
+	 (match (update-eye-center eye-position center)
 	   ((eye . center)
-	    (make-mvp-matrix model
-			     (update-view eye center)
-			     projection
-			     eye center))))
+	    (cons (make-mvp-matrix model
+				   (update-view eye center)
+				   projection
+				   eye
+				   center) eye))))
 	(else (error "current matrix not valid" current-matrix))))))
 
 
@@ -165,7 +205,7 @@ Usage and tests:
 (define center (make-vector3 0.0 0.0 0.0))
 (define up (make-vector3 0.0 0.0 1.0))
 
-(define dir (vector- center eye))
+(define dir (vector3- center eye))
 
 
 

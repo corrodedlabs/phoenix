@@ -46,6 +46,7 @@
 ;; these are usually saved in the field attrs of vertex-input-metadata
 (define vector->attr
   (lambda (input)
+    (displayln "input is " input)
     (let lp ((elems input)
 	     (offset 0)
 	     (attrs (list)))
@@ -457,23 +458,23 @@
 (define physical-device (vulkan-state-physical-device vs))
 (define swapchain-details (vulkan-state-swapchain vs))
 
-(define vertices (list (make-vertex-input '#3( -0.5 -0.5 0.0) '#3(1.0 0.0 0.0) '#2(1.0 0.0))
-		       (make-vertex-input '#3( 0.5  -0.5 0.0) '#3(0.0 1.0 0.0) '#2(0.0 0.0))
-		       (make-vertex-input '#3( 0.5   0.5 0.0) '#3(0.0 0.0 1.0) '#2(0.0 1.0))
-		       (make-vertex-input '#3(-0.5   0.5 0.0) '#3(1.0 1.0 1.0) '#2(1.0 1.0))
+;; (define vertices (list (make-vertex-input '#3( -0.5 -0.5 0.0) '#3(1.0 0.0 0.0) '#2(1.0 0.0))
+;; 		       (make-vertex-input '#3( 0.5  -0.5 0.0) '#3(0.0 1.0 0.0) '#2(0.0 0.0))
+;; 		       (make-vertex-input '#3( 0.5   0.5 0.0) '#3(0.0 0.0 1.0) '#2(0.0 1.0))
+;; 		       (make-vertex-input '#3(-0.5   0.5 0.0) '#3(1.0 1.0 1.0) '#2(1.0 1.0))
 
-		       (make-vertex-input '#3( -0.5 -0.5 -0.5) '#3(1.0 0.0 0.0) '#2(1.0 0.0))
-		       (make-vertex-input '#3( 0.5  -0.5 -0.5) '#3(0.0 1.0 0.0) '#2(0.0 0.0))
-		       (make-vertex-input '#3( 0.5   0.5 -0.5) '#3(0.0 0.0 1.0) '#2(0.0 1.0))
-		       (make-vertex-input '#3(-0.5   0.5 -0.5) '#3(1.0 1.0 1.0) '#2(1.0 1.0))))
+;; 		       (make-vertex-input '#3( -0.5 -0.5 -0.5) '#3(1.0 0.0 0.0) '#2(1.0 0.0))
+;; 		       (make-vertex-input '#3( 0.5  -0.5 -0.5) '#3(0.0 1.0 0.0) '#2(0.0 0.0))
+;; 		       (make-vertex-input '#3( 0.5   0.5 -0.5) '#3(0.0 0.0 1.0) '#2(0.0 1.0))
+;; 		       (make-vertex-input '#3(-0.5   0.5 -0.5) '#3(1.0 1.0 1.0) '#2(1.0 1.0))))
 
-(define indices (list 0 1 2 2 3 0
-		      4 5 6 6 7 4))
+;; (define indices (list 0 1 2 2 3 0
+;; 		      4 5 6 6 7 4))
 
 (define shaders (make-shaders "shaders/shader.vert" "shaders/shader.frag"))
 
 
-(define vertex-input-metadata (create-vertex-input-metadata "models/turret.obj"))
+(define vertex-input-metadata (model->vertex-input-metadata "models/turret.obj"))
 
 (define pipeline-data
   (make-pipeline-data shaders (vertex-input->details vertex-input-metadata)))

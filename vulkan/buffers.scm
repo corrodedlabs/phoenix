@@ -410,13 +410,15 @@
 	 (iota num-buffers))))
 
 (define update-uniform-buffer
-  (lambda (device uniform-buffer movement-direction)
+  (lambda (device uniform-buffer eye-position movement-direction)
     (match (car uniform-buffer)
       (($ buffer handle memory size)
-       (copy-data-from-scheme device
-			      memory
-			      (uniform-buffer-data->list
-			       (update-mvp-matrix (cdr uniform-buffer) movement-direction))))
+       (match (update-mvp-matrix (cdr uniform-buffer) eye-position movement-direction)
+	 ((matrix . eye)
+	  (copy-data-from-scheme device
+				 memory
+				 (uniform-buffer-data->list matrix))
+	  eye)))
       (else (error "unifor buffer not valid" uniform-buffer)))))
 
 ;; Descriptor sets and pools
@@ -539,7 +541,7 @@
   (create-gpu-local-buffer physical-device
 			   device
 			   graphics-queue
-			   (vertex-input-metadata-vertices-list input-metadata)
+			   (vertex-input-metadata-vertices-list vertex-input-metadata)
 			   vk-buffer-usage-vertex-buffer-bit))
 
 ;; (displayln "vertex buffer done" vertex-buffer)
@@ -548,7 +550,7 @@
   (create-gpu-local-buffer physical-device
 			   device
 			   graphics-queue
-			   (vertex-input-metadata-indices input-metadata)
+			   (vertex-input-metadata-indices vertex-input-metadata)
 			   vk-buffer-usage-index-buffer-bit))
 
 ;; (displayln "index buffer created" index-buffer)
@@ -600,7 +602,7 @@
 			  pipeline
 			  framebuffers
 			  sets
-			  (length (vertex-input-metadata-indices input-metadata))))
+			  (length (vertex-input-metadata-indices vertex-input-metadata))))
 
 (displayln "command buffers created" cmd-buffers)
 

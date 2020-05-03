@@ -49,10 +49,11 @@
   (lambda (window device swapchain uniform-buffers cmd-buffers sync-objects state)
     (display "starting draw loop") (newline)
     (let ((image-index (make-foreign-object u32))
-	  (cmd-buffers-arr (vk-command-buffer-pointer-map identity cmd-buffers))
 	  (uniform-buffers (list->vector uniform-buffers))
+	  (cmd-buffers-arr (vk-command-buffer-pointer-map identity cmd-buffers))
 	  (swapchain-handle (swapchain-handle swapchain)))
       (let lp ((state state)
+	       (eye-position (make-vector3 2.0 2.0 2.0))
 	       (i 0))
 	(cond
 	 ((and *debug* (fx= i 300)) state)
@@ -69,44 +70,45 @@
 					   available-semaphore
 					   0
 					   image-index)
-		(update-uniform-buffer device
-				       (vector-ref uniform-buffers
-						   (read-unsigned-32 image-index))
-				       (get-movement-direction window))
-		(cond
-		 ((vector-ref images-in-flight (read-unsigned-32 image-index)) =>
-		  (lambda (image-in-flight)
-		    (vk-wait-for-fences device 1 image-in-flight 1 +timeout+))))
-		(vector-set! images-in-flight (read-unsigned-32 image-index) in-flight-fence)
-		(let ((cmd-buffer (list-ref cmd-buffers-arr (read-unsigned-32 image-index)))
-		      (wait-dst-mask (make-foreign-object flags)))
-		  (ftype-set! flags
-			      ()
-			      wait-dst-mask
-			      vk-pipeline-stage-color-attachment-output-bit)
-		  (vk-reset-fences device 1 in-flight-fence)
-		  (vk-queue-submit graphics-queue
-				   1
-				   (make-vk-submit-info submit-info
-							0
-							1
-							available-semaphore
-							(array-pointer-raw-ptr
-							 (list->u32-pointer-array
-							  (list wait-dst-mask)))
-							1
-							cmd-buffer
-							1
-							finished-semaphore)
-				   (pointer-ref-value in-flight-fence))
-		  (vk-queue-present-khr present-queue
-					(make-present-info swapchain-handle
-							   finished-semaphore
-							   image-index))
-		  (poll-events))
-		(lp (make-frame-state (mod (fx+ current-frame 1) +frames-in-flight+)
-				      images-in-flight)
-		    (+ 1 i)))))))
+		(let ((index (read-unsigned-32 image-index)))
+		  (cond
+		   ((vector-ref images-in-flight index) =>
+		    (lambda (image-in-flight)
+		      (vk-wait-for-fences device 1 image-in-flight 1 +timeout+))))
+		  (vector-set! images-in-flight index in-flight-fence)
+		  (let ((cmd-buffer (list-ref cmd-buffers-arr (read-unsigned-32 image-index)))
+			(wait-dst-mask (make-foreign-object flags)))
+		    (ftype-set! flags
+				()
+				wait-dst-mask
+				vk-pipeline-stage-color-attachment-output-bit)
+		    (vk-reset-fences device 1 in-flight-fence)
+		    (vk-queue-submit graphics-queue
+				     1
+				     (make-vk-submit-info submit-info
+							  0
+							  1
+							  available-semaphore
+							  (array-pointer-raw-ptr
+							   (list->u32-pointer-array
+							    (list wait-dst-mask)))
+							  1
+							  cmd-buffer
+							  1
+							  finished-semaphore)
+				     (pointer-ref-value in-flight-fence))
+		    (vk-queue-present-khr present-queue
+					  (make-present-info swapchain-handle
+							     finished-semaphore
+							     image-index))
+		    (poll-events))
+		  (lp (make-frame-state (mod (fx+ current-frame 1) +frames-in-flight+)
+					images-in-flight)
+		      (update-uniform-buffer device
+					     (vector-ref uniform-buffers index)
+					     eye-position
+					     (get-movement-direction window))
+		      (+ 1 i))))))))
 	 (else (begin (display "frame loop stopped")
 		      (newline))))))))
 

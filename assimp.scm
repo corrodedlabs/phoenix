@@ -46,7 +46,7 @@
 
   ;; structs
 
-  (define-ftype ai-real double-float)
+  (define-ftype ai-real float)
 
   (define-collection-lambdas unsigned)
 
@@ -117,9 +117,9 @@
      (method . unsigned)))
 
   (define-foreign-struct scene
-    ((flags . unsigned-32)
+    ((flags . unsigned)
      (root-node . uptr)
-     (num-meshes . unsigned-32)
+     (num-meshes . unsigned)
      (meshes . uptr)
      (num-materials .  unsigned)
      (materials .  uptr)
@@ -164,12 +164,11 @@
 
   ;; load library
 
-  (define o (load-shared-object "libassimp.so"))
+  (define o (load-shared-object "libassimp.so.5.0.0"))
 
   ;; define native functions
 
-  (define import_file
-    (foreign-procedure "aiImportFile" (string unsigned) (* scene)))
+  (define import_file (foreign-procedure "aiImportFile" (string unsigned) (* scene)))
 
 
   ;; run
@@ -183,34 +182,32 @@
   ;; record to collect vertex buffer data
   (define-record-type vertex-buffer-data (fields vertices normals uv colors))
 
-  (define (mesh-ptr->vertex-buffer-data mesh-ptr)
-    
-    (define num-vertices (mesh-num-vertices mesh-ptr))
+  (define (mesh-ptr->vertex-buffer-data mesh-ptr)    
+    (let* ((num-vertices (mesh-num-vertices mesh-ptr))
 
-    (define vertices
-      (map flip-vertices
-	   (vector3-array-ptr->list (make-array-pointer num-vertices
-							(mesh-vertices mesh-ptr)
-							'vector3))))
+	   (vertices
+	    ;; (map flip-vertices)
+	    (vector3-array-ptr->list (make-array-pointer num-vertices
+							 (mesh-vertices mesh-ptr)
+							 'vector3)))
+	   (normals
+	    (vector3-array-ptr->list (make-array-pointer num-vertices
+							 (mesh-normals mesh-ptr)
+							 'vector3)))
 
-
-    (define normals
-      (vector3-array-ptr->list (make-array-pointer num-vertices
-						   (mesh-normals mesh-ptr)
-						   'vector3)))
-
-
-    ;; Texture coordinates may have multiple channels, we only use the first we find
-    (define texture-coords-channel
-      (find (lambda (ptr)
-	      (not (ftype-pointer-null? ptr))) (mesh-texture-coords mesh-ptr)))
-
-    (define texture-coords
-      (vector3-array-ptr->list (make-array-pointer num-vertices
-						   texture-coords-channel
-						   'vector3)))
-
-    (make-vertex-buffer-data vertices normals texture-coords #f))
+	   ;; Texture coordinates may have multiple channels, we only use the first we find
+	   (texture-coords-channel
+	    (find (lambda (ptr)
+		    (not (ftype-pointer-null? ptr))) (mesh-texture-coords mesh-ptr)))
+	   
+	   (texture-coords
+	    (map (lambda (uv-coords)
+		   (list (car uv-coords) (cadr uv-coords)))
+		 (vector3-array-ptr->list (make-array-pointer num-vertices
+							      texture-coords-channel
+							      'vector3)))))
+      (displayln "vertices are number: " num-vertices)
+      (make-vertex-buffer-data vertices normals texture-coords #f)))
 
 
   ;; data for index buffer
@@ -218,10 +215,11 @@
     (lambda (mesh-ptr)
       
       (define concatenate (lambda (xs) (apply append xs)))
-      
+      (displayln "num of faces is " (mesh-num-faces mesh-ptr))
       (concatenate (face-pointer-map
 		    (lambda (face-ptr)
-		      (unsigned-pointer-map (lambda (ptr) (read-unsigned ptr))
+		      (displayln "num indices " (face-num-indices face-ptr))
+		      (unsigned-pointer-map (lambda (x) (read-unsigned x))
 					    (make-array-pointer (face-num-indices face-ptr)
 								(face-indices face-ptr)
 								'unsigned)))
@@ -239,23 +237,29 @@
   ;; fn to import a model
   (define import-model
     (lambda (model)
-      (define scene-ptr
-	(import_file model
-		     (bitwise-ior flip-winding-order triangulate pretransform-vertices)))
-
-
-      ;; just reading the first mesh
-      (define mesh-ptr
-	(make-ftype-pointer mesh (foreign-ref 'uptr (scene-meshes scene-ptr) 0)))
-
-      (let ((vertex-data (mesh-ptr->vertex-buffer-data mesh-ptr))
-	    (indices (mesh-ptr->indices mesh-ptr)))
-	(make-model-data vertex-data indices)))))
+      (let* ((scene-ptr (import_file model 
+				     (bitwise-ior flip-winding-order
+						  triangulate
+						  pretransform-vertices
+						  validate-data-structure
+						  make-left-handed)))
+	     
+	     ;; just reading the first mesh
+	     (mesh-ptr
+	      (make-ftype-pointer mesh
+				  (foreign-ref 'uptr (scene-meshes scene-ptr) 0))))
+	(let ((vertex-data (mesh-ptr->vertex-buffer-data mesh-ptr))
+	      (indices (mesh-ptr->indices mesh-ptr)))
+	  (displayln "loading model" model)
+	  (displayln "num of meshes is "  (scene-num-meshes scene-ptr))
+	  (make-model-data vertex-data indices))))))
 
 ;; Example usage:
 
 ;; > (load "assimp.scm")
 ;; > (import (assimp))
 
-;; > (define model-data-obj (import-model "models/turret.obj"))
+;; (define model-data-obj (import-model "models/cube.obj"))
+
+;; (length (vertex-buffer-data-vertices (model-data-vertex-data model-data-obj)))
 
