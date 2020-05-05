@@ -591,7 +591,7 @@
 ;; (define depth-buffer-image
 ;;   (create-depth-buffer-image physical-device device command-pool graphics-queue swapchain))
 
-(define clear-values (list 0.0 0.0 0.0 1.0))
+(define clear-values (list 0.025 0.025 0.025 1.0))
 
 (display "going to created cmd buffers") (newline)
 

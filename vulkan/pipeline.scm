@@ -474,7 +474,7 @@
 (define shaders (make-shaders "shaders/shader.vert" "shaders/shader.frag"))
 
 
-(define vertex-input-metadata (model->vertex-input-metadata "models/turret.obj"))
+(define vertex-input-metadata (model->vertex-input-metadata "models/cube.dae"))
 
 (define pipeline-data
   (make-pipeline-data shaders (vertex-input->details vertex-input-metadata)))

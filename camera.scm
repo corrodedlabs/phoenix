@@ -127,11 +127,11 @@
   (define calculate-mvp-matrix
     (lambda (screen-width screen-height)
       (let ((eye (make-vector3 2.0 2.0 2.0))
-	    (center (make-vector3 0.0 0.0 0.))
-	    (fovy 45)
+	    (center (make-vector3 0.0 0.0 0.0))
+	    (fovy 120)
 	    (aspect (/ screen-width screen-height))
 	    (near 0.1)
-	    (far 10.0))
+	    (far 100.0))
 	(make-mvp-matrix (from-angle-z 90)
 			 (look-at eye center up)
 			 (perspective fovy aspect near far)
@@ -143,13 +143,14 @@
   (define-syntax right (identifier-syntax 'right))
   (define-syntax left (identifier-syntax 'left))
 
-  (define *speed* 2)
+  (define *speed* 0.5)
   (define t0 (current-time))
 
   (define update-mvp-matrix
     (lambda (current-matrix eye-position movement-direction)
 
-      (define update-view (lambda (eye center) (look-at eye center up)))
+      (define update-view (lambda (eye center)
+			    (look-at eye center up)))
 
       (define move
       	(lambda (direction eye)
@@ -184,12 +185,12 @@
       (match current-matrix
 	(($ mvp-matrix model view projection eye center)
 	 (match (update-eye-center eye-position center)
-	   ((eye . center)
+	   ((eye1 . center1)
 	    (cons (make-mvp-matrix model
-				   (update-view eye center)
+				   (update-view eye1 center1)
 				   projection
-				   eye
-				   center) eye))))
+				   eye1
+				   center) eye1))))
 	(else (error "current matrix not valid" current-matrix))))))
 
 
