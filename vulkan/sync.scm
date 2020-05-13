@@ -53,7 +53,8 @@
 	  (cmd-buffers-arr (vk-command-buffer-pointer-map identity cmd-buffers))
 	  (swapchain-handle (swapchain-handle swapchain)))
       (let lp ((state state)
-	       (eye-position (make-vector3 2.0 2.0 2.0))
+	       (eye-position (cons (cdr (vector-ref uniform-buffers 0))
+				   (make-vector3 10.0 13.0 1.8)))
 	       (i 0))
 	(cond
 	 ((and *debug* (fx= i 300)) state)
@@ -106,7 +107,8 @@
 					images-in-flight)
 		      (update-uniform-buffer device
 					     (vector-ref uniform-buffers index)
-					     eye-position
+					     (car eye-position)
+					     (cdr eye-position)
 					     (get-movement-direction window))
 		      (+ 1 i))))))))
 	 (else (begin (display "frame loop stopped")

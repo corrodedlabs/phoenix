@@ -410,15 +410,16 @@
 	 (iota num-buffers))))
 
 (define update-uniform-buffer
-  (lambda (device uniform-buffer eye-position movement-direction)
-    (match (car uniform-buffer)
+  (lambda (device uniform-buffer matrix eye-position movement-direction)
+    (displayln "uniform buffer" uniform-buffer "matrix" matrix "eye position" eye-position)
+    (match  (car uniform-buffer)
       (($ buffer handle memory size)
-       (match (update-mvp-matrix (cdr uniform-buffer) eye-position movement-direction)
+       (match (update-mvp-matrix matrix eye-position movement-direction)
 	 ((matrix . eye)
 	  (copy-data-from-scheme device
 				 memory
 				 (uniform-buffer-data->list matrix))
-	  eye)))
+	  (cons matrix eye))))
       (else (error "unifor buffer not valid" uniform-buffer)))))
 
 ;; Descriptor sets and pools

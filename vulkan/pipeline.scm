@@ -32,9 +32,6 @@
 				      (create-shader-module frag-spv))))))
 
 
-(define displayln
-  (lambda (tag x) (display tag) (display ":") (display x) (newline)))
-
 ;; vertex input
 
 (define-record-type vertex-input-metadata (fields size vertices-list stride indices attrs))

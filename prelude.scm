@@ -19,12 +19,12 @@
   (define construct-name
     (lambda (template-identifier . args)
       (datum->syntax template-identifier
-	(string->symbol (apply string-append
-			  (map (lambda (x)
-				 (if (string? x)
-				   x
-				   (symbol->string (syntax->datum x))))
-			       args))))))
+		     (string->symbol (apply string-append
+					    (map (lambda (x)
+						   (if (string? x)
+						       x
+						       (symbol->string (syntax->datum x))))
+						 args))))))
 
   (define map-indexed
     (lambda (f arr)
