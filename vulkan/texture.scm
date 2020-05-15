@@ -1,7 +1,7 @@
 
 (define texture-path "textures/winter.jpeg")
 
-(define swapchain (vulkan-state-swapchain vs))
+;; (define swapchain (vulkan-state-swapchain vs))
 
 (define-record-type texture-data (fields image-view sampler))
 

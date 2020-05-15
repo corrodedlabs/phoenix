@@ -20,8 +20,10 @@
 
     (define choose-present-modes
       (lambda ()
+	(displayln "present modes" present-modes)
 	(or (vk-present-mode-khr-pointer-find (lambda (mode)
-					       (equal? mode vk-present-mode-mailbox-khr))
+					       (or (equal? mode vk-present-mode-mailbox-khr)
+						  (equal? mode vk-present-mode-fifo-khr)))
 					     present-modes)
 	   (vk-present-mode-khr-pointer-car present-modes))))
 

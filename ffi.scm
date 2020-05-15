@@ -19,7 +19,6 @@
 	  define-foreign-struct
 	  define-enum-ftype
 	  cstring
-	  construct-name
 	  null-pointer
 
 	  define-collection-lambdas
@@ -265,11 +264,11 @@
 		      ((= i (array-pointer-length arr-ptr)) (reverse xs))
 
 		      (else (lp (fx+ 1 i)
-				(cons (f (ftype-&ref pointer-type
-						     ()
-						     (array-pointer-raw-ptr arr-ptr)
-						     i))
-				      xs)))))))
+				(cons   (f (ftype-&ref pointer-type
+						       ()
+						       (array-pointer-raw-ptr arr-ptr)
+						       i))
+					xs)))))))
 
 	       (define find-lambda
 		 (lambda (f arr-ptr)
@@ -333,14 +332,14 @@
       ;; used for generating nested setters and getters for ftypes
       (define struct-info)
 
-      (define scalar-type '(unsigned-32 int uptr unsigned))
+      (define scalar-type '(unsigned-32 int uptr unsigned size_t float single-float))
 
       (define array-type?
 	(lambda (type)
 	  (and (list? type)
-	       (fx=? (length type) 3)
-	       (equal? 'array (car type))
-	       (number? (cadr type)))))
+	     (fx=? (length type) 3)
+	     (equal? 'array (car type))
+	     (number? (cadr type)))))
       
       (define construct-make-def
 	(lambda (struct-name member-spec member-details)
@@ -499,9 +498,9 @@
 					 (map (lambda (type)
 						(display "type") (display type) (newline)
 						(let ((members (and (identifier? type)
-								    (not (member (syntax->datum type)
-										 scalar-type))
-								    (lookup type #'struct-info))))
+								  (not (member (syntax->datum type)
+									     scalar-type))
+								  (lookup type #'struct-info))))
 						  (cond
 						   (members
 						    (cons (syntax->datum type) members))

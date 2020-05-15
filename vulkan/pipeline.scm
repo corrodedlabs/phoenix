@@ -447,13 +447,13 @@
 				    pipeline)
       (make-pipeline pipeline (car layout) render-pass (cdr layout)))))
 
-(load "vulkan/mesh.scm")
+;; (load "vulkan/mesh.scm")
 
 ;; samplte usage
 
-(define device (vulkan-state-device vs))
-(define physical-device (vulkan-state-physical-device vs))
-(define swapchain-details (vulkan-state-swapchain vs))
+;; (define device (vulkan-state-device vs))
+;; (define physical-device (vulkan-state-physical-device vs))
+;; (define swapchain-details (vulkan-state-swapchain vs))
 
 ;; (define vertices (list (make-vertex-input '#3( -0.5 -0.5 0.0) '#3(1.0 0.0 0.0) '#2(1.0 0.0))
 ;; 		       (make-vertex-input '#3( 0.5  -0.5 0.0) '#3(0.0 1.0 0.0) '#2(0.0 0.0))
@@ -468,16 +468,16 @@
 ;; (define indices (list 0 1 2 2 3 0
 ;; 		      4 5 6 6 7 4))
 
-(define shaders (make-shaders "shaders/shader.vert" "shaders/shader.frag"))
+;; (define shaders (make-shaders "shaders/shader.vert" "shaders/shader.frag"))
 
 
-(define vertex-input-metadata (model->vertex-input-metadata "models/cube.dae"))
+;; (define vertex-input-metadata (model->vertex-input-metadata "models/box.obj"))
 
-(define pipeline-data
-  (make-pipeline-data shaders (vertex-input->details vertex-input-metadata)))
+;; (define pipeline-data
+;;   (make-pipeline-data shaders (vertex-input->details vertex-input-metadata)))
 
-(define pipeline
-  (create-graphics-pipeline physical-device device swapchain-details pipeline-data))
+;; (define pipeline
+;;   (create-graphics-pipeline physical-device device swapchain-details pipeline-data))
 #!eof
 
 =========================================================================================

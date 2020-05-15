@@ -130,7 +130,7 @@
   command-buffer
   fence
   device-memory
-  buffer
+  object-type-buffer
   image
   event
   query-pool
@@ -138,15 +138,15 @@
   image-view
   shader-module
   pipeline-cache
-  pipeline-layout
+  object-type-pipeline-layout
   render-pass
-  pipeline
+  object-type-pipeline
   descriptor-set-layout
   sampler
   descriptor-pool
   descriptor-set
   framebuffer
-  command-pool
+  object-type-command-pool
   (sampler-ycbcr-conversion 1000156000)
   (descriptor-update-template 1000085000)
   (surface-khr  1000000000)
@@ -531,7 +531,6 @@
 
 
 ;; images
-(define-ftype vk-image uptr)
 
 (define-enum-ftype vk-image-type
   (vk-image-type-1d  0)
@@ -816,21 +815,6 @@
 (define-ftype vk-descriptor-set-layout uptr)
 
 (define-collection-lambdas vk-descriptor-set-layout)
-
-(define-enum-ftype vk-descriptor-type
-  vk-descriptor-type-sampler
-  vk-descriptor-type-combined-image-sampler
-  vk-descriptor-type-sampled-image
-  vk-descriptor-type-storage-image
-  vk-descriptor-type-uniform-texel-buffer
-  vk-descriptor-type-storage-texel-buffer
-  vk-descriptor-type-uniform-buffer
-  vk-descriptor-type-storage-buffer
-  vk-descriptor-type-uniform-buffer-dynamic
-  vk-descriptor-type-storage-buffer-dynamic
-  vk-descriptor-type-input-attachment
-  (vk-descriptor-type-inline-uniform-block-ext  1000138000)
-  (vk-descriptor-type-acceleration-structure-nv  1000165000))
 
 (define-ftype vk-sampler uptr)
 

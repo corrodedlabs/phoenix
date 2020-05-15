@@ -1,5 +1,5 @@
 
-(define vertex-input? vertex-buffer-data?)
+;; (define vertex-input? vertex-buffer-data?)
 
 (define white-color (list 1.0 1.0 0.0))
 

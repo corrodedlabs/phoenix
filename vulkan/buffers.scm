@@ -127,7 +127,10 @@
 
 
 (define create-command-buffers
-  (lambda (device swapchain command-pool pipeline framebuffers descriptor-sets indices-length)
+  (lambda (device swapchain command-pool pipeline vertex-buffer index-buffer framebuffers
+	     descriptor-sets indices-length)
+
+    (define clear-values (list 0.025 0.025 0.025 1.0))
 
     (define clear-values-ptr
       (lambda ()
@@ -371,7 +374,7 @@
 ;; a staging buffer will be used to copy the data over
 ;; different usage may be made available using identifier syntax
 (define create-gpu-local-buffer
-  (lambda (physical-device device graphics-queue data usage)
+  (lambda (physical-device device graphics-queue command-pool data usage)
     (let* ((staging-buffer (create-host-buffer physical-device device data))
 	   (size (sizeof-scheme-data data))
 	   (gpu-buffer-ptr (create-new-buffer device size gpu-local usage))
@@ -411,7 +414,7 @@
 
 (define update-uniform-buffer
   (lambda (device uniform-buffer matrix eye-position movement-direction)
-    (displayln "uniform buffer" uniform-buffer "matrix" matrix "eye position" eye-position)
+    ;; (displayln "uniform buffer" uniform-buffer "matrix" matrix "eye position" eye-position)
     (match  (car uniform-buffer)
       (($ buffer handle memory size)
        (match (update-mvp-matrix matrix eye-position movement-direction)
@@ -462,10 +465,10 @@
 	  (vk-allocate-descriptor-sets device alloc-info set)
 	  (make-array-pointer num-sets set 'vk-descriptor-set))))
 
-    (let ((num-sets (length uniform-buffers))
-	  ;; todo can be optimized further
-	  (ubo-size (sizeof-scheme-data (uniform-buffer-data->list (cdar uniform-buffers))))
-	  (descriptor-sets  (allocate-descriptor-sets num-sets)))
+    (let* ((num-sets (length uniform-buffers))
+	   ;; todo can be optimized further
+	   (ubo-size (sizeof-scheme-data (uniform-buffer-data->list (cdar uniform-buffers))))
+	   (descriptor-sets  (allocate-descriptor-sets num-sets)))
       (displayln "ubo size is" ubo-size)
       (map (lambda (uniform-buffer descriptor-set)
 	     (let* ((buffer-info
@@ -518,94 +521,96 @@
 
 ;; Sample usage
 
-(define image-views (swapchain-image-views swapchain-details))
-(define device (vulkan-state-device vs))
-(define queue-index (vulkan-state-queue-index vs))
-(define command-pool (create-command-pool device queue-index))
+;; (define image-views (swapchain-image-views swapchain-details))
+;; (define device (vulkan-state-device vs))
+;; (define queue-index (vulkan-state-queue-index vs))
+;; (define command-pool (create-command-pool device queue-index))
 
+#|
 ;; (define size (fold-left + 0 (map vertex-input-total-size vertices)))
 ;; (define buffer-ptr (create-new-buffer device size host-local))
 
 ;; (define memory (allocate-memory buffer-ptr))
 
 ;; (define memory-requirements (get-memory-requirements buffer))
+|#
 
-(define physical-device (vulkan-state-physical-device vs))
+;; (define physical-device (vulkan-state-physical-device vs))
 ;; (define buf (create-host-buffer physical-device device vertices))
 
-(define graphics-queue (car (vulkan-state-queues vs)))
-(define present-queue (cdr (vulkan-state-queues vs)))
+;; (define graphics-queue (car (vulkan-state-queues vs)))
+;; (define present-queue (cdr (vulkan-state-queues vs)))
 
-(display "creating buffers") (newline)
+;; (display "creating buffers") (newline)
 
-(define vertex-buffer
-  (create-gpu-local-buffer physical-device
-			   device
-			   graphics-queue
-			   (vertex-input-metadata-vertices-list vertex-input-metadata)
-			   vk-buffer-usage-vertex-buffer-bit))
+;; (define vertex-buffer
+;;   (create-gpu-local-buffer physical-device
+;; 			   device
+;; 			   graphics-queue
+;; 			   (vertex-input-metadata-vertices-list vertex-input-metadata)
+;; 			   vk-buffer-usage-vertex-buffer-bit))
 
 ;; (displayln "vertex buffer done" vertex-buffer)
 
-(define index-buffer
-  (create-gpu-local-buffer physical-device
-			   device
-			   graphics-queue
-			   (vertex-input-metadata-indices vertex-input-metadata)
-			   vk-buffer-usage-index-buffer-bit))
+;; (define index-buffer
+;;   (create-gpu-local-buffer physical-device
+;; 			   device
+;; 			   graphics-queue
+;; 			   (vertex-input-metadata-indices vertex-input-metadata)
+;; 			   vk-buffer-usage-index-buffer-bit))
 
 ;; (displayln "index buffer created" index-buffer)
 
-(define image-view (car image-views))
+;; (define image-view (car image-views))
 
-(define framebuffers (create-framebuffers physical-device device command-pool
-					  graphics-queue swapchain-details pipeline ))
-(displayln "framebuffers created " framebuffers)
+;; (define framebuffers (create-framebuffers physical-device device command-pool
+;; 					  graphics-queue swapchain-details pipeline ))
+;; (displayln "framebuffers created " framebuffers)
 
-(define swapchain (vulkan-state-swapchain vs))
-(define extent (swapchain-extent (vulkan-state-swapchain vs)))
+;; (define swapchain (vulkan-state-swapchain vs))
+;; (define extent (swapchain-extent (vulkan-state-swapchain vs)))
 
-(define uniform-buffer-data (extent->uniform-buffer-data extent))
+;; (define uniform-buffer-data (extent->uniform-buffer-data extent))
 
-(define uniform-buffers (create-uniform-buffers physical-device
-						device
-						uniform-buffer-data
-						(length framebuffers)))
+;; (define uniform-buffers (create-uniform-buffers physical-device
+;; 						device
+;; 						uniform-buffer-data
+;; 						(length framebuffers)))
 
-(define descriptor-count (length uniform-buffers))
+;; (define descriptor-count (length uniform-buffers))
 
-(define descriptor-pool (create-descriptor-pool device
-						(length uniform-buffers)))
+;; (define descriptor-pool (create-descriptor-pool device
+;; 						(length uniform-buffers)))
 
-(define descriptor-layout (pipeline-descriptor-set-layout pipeline))
-(define num-sets (length uniform-buffers))
+;; (define descriptor-layout (pipeline-descriptor-set-layout pipeline))
+;; (define num-sets (length uniform-buffers))
 
-(define texture-data (create-texture-data physical-device device command-pool graphics-queue
-					  swapchain))
+;; (define texture-data (create-texture-data physical-device device command-pool graphics-queue
+;; 					  swapchain))
 
-(define sets (create-descriptor-sets device
-				     descriptor-pool
-				     descriptor-layout
-				     uniform-buffers
-				     texture-data))
+;; (define sets (create-descriptor-sets device
+;; 				     descriptor-pool
+;; 				     descriptor-layout
+;; 				     uniform-buffers
+;; 				     texture-data))
 
 ;; (define depth-buffer-image
 ;;   (create-depth-buffer-image physical-device device command-pool graphics-queue swapchain))
 
-(define clear-values (list 0.025 0.025 0.025 1.0))
+;; (display "going to created cmd buffers") (newline)
 
-(display "going to created cmd buffers") (newline)
+;; (define cmd-buffers
+;;   (create-command-buffers device
+;; 			  swapchain
+;; 			  command-pool
+;; 			  pipeline
+;; 			  vertex-buffer
+;; 			  index-buffer
+;; 			  framebuffers
+;; 			  sets
+;; 			  (length (vertex-input-metadata-indices vertex-input-metadata))))
 
-(define cmd-buffers
-  (create-command-buffers device
-			  swapchain
-			  command-pool
-			  pipeline
-			  framebuffers
-			  sets
-			  (length (vertex-input-metadata-indices vertex-input-metadata))))
-
-(displayln "command buffers created" cmd-buffers)
+;; (displayln "command buffers created" cmd-buffers)
 
 ;; (define memory (buffer-memory buf))
 ;; (define data-size(buffer-size buf))
