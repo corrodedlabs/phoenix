@@ -128,7 +128,7 @@
 
 (define create-command-buffers
   (lambda (device swapchain command-pool pipeline vertex-buffer index-buffer framebuffers
-	     descriptor-sets indices-length)
+		  descriptor-sets indices-length)
 
     (define clear-values (list 0.025 0.025 0.025 1.0))
 
@@ -177,7 +177,7 @@
 	  			       descriptor-set
 	  			       0
 	  			       (null-pointer u32))
-	  (vk-cmd-draw-indexed cmd-buffer indices-length 1 0 0 0)
+	  (vk-cmd-draw cmd-buffer indices-length 1 0 0 )
 	  (vk-cmd-end-render-pass cmd-buffer)
 	  cmd-buffer)))
 

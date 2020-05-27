@@ -316,12 +316,12 @@
 		       child-nodes)))))
     
     (let* ((scene-ptr (import_file model
-				   (bitwise-ior 
-				    flip-winding-order
-				    triangulate
-				    pretransform-vertices
-				    calc-tangent-space
-				    gen-smooth-normals)))
+				   (bitwise-ior flip-winding-order
+						triangulate
+						pretransform-vertices
+						calc-tangent-space
+						gen-smooth-normals
+						make-left-handed)))
 	   (meshes-list (double-pointer->list (scene-meshes scene-ptr)
 					      mesh
 					      (scene-num-meshes scene-ptr))))

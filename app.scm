@@ -15,7 +15,7 @@
   (match-let* (((vertex-input-metadata . pipeline)
 		(create-pipeline state
 				 shaders
-				 "models/sampleroom.dae"))
+				 "models/Sponza-master/sponza.obj"))
 	       ((uniform-buffers . command-buffers) (create-buffers state
 								    vertex-input-metadata
 								    pipeline)))
