@@ -1,5 +1,5 @@
 
-(define texture-path "textures/winter.jpeg")
+(define texture-path "textures/udejafqg_2K_Albedo.jpg")
 
 ;; (define swapchain (vulkan-state-swapchain vs))
 

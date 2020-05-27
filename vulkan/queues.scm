@@ -27,7 +27,8 @@
 	;; these could be different queues
 	;; todo handle different queues
 	(and (bitwise-ior (vk-queue-family-properties-queue-flags family-prop)
-			vk-queue-graphics-bit)
+			vk-queue-graphics-bit
+			vk-queue-compute-bit)
 	   (surface-support? i))))
 
     

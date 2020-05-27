@@ -28,7 +28,10 @@
 	  array-pointer-empty?
 	  array-pointer?
 	  with-new-array-pointer
-	  pointer-ref-value)
+	  pointer-ref-value
+	  pointer-ref-ftype
+
+	  double-pointer->list)
 
   (import (chezscheme)
 	  (prelude))
@@ -179,11 +182,25 @@
 
   (define-syntax pointer-ref-value
     (syntax-rules ()
-      ((_ ptr) (foreign-ref 'uptr (ftype-pointer-address ptr) 0))))
+      ((_ ptr) (cond
+		((ftype-pointer-null? ptr) 0)
+		(else (foreign-ref 'uptr (ftype-pointer-address ptr) 0))))))
+
+  (define-syntax pointer-ref-ftype
+    (syntax-rules ()
+      ((_ ftype ptr) (make-ftype-pointer ftype (pointer-ref-value ptr)))))
 
   (define-syntax null-pointer
     (syntax-rules ()
       ((_ type) (make-ftype-pointer type 0))))
+
+  (define-syntax double-pointer->list
+    (syntax-rules ()
+      ((_ ptr ptr-type length)
+       (map (lambda (i)
+	      (make-ftype-pointer ptr-type
+				  (foreign-ref 'uptr ptr (* i (ftype-sizeof uptr)))))
+	    (iota length)))))
 
   (meta define-syntax define-ptr-lambda 
 	(syntax-rules ()
@@ -264,11 +281,12 @@
 		      ((= i (array-pointer-length arr-ptr)) (reverse xs))
 
 		      (else (lp (fx+ 1 i)
-				(cons   (f (ftype-&ref pointer-type
-						       ()
-						       (array-pointer-raw-ptr arr-ptr)
-						       i))
-					xs)))))))
+				(cons (and (array-pointer-raw-ptr arr-ptr)
+					 (f (ftype-&ref pointer-type
+							()
+							(array-pointer-raw-ptr arr-ptr)
+							i)))
+				      xs)))))))
 
 	       (define find-lambda
 		 (lambda (f arr-ptr)
@@ -337,9 +355,9 @@
       (define array-type?
 	(lambda (type)
 	  (and (list? type)
-	     (fx=? (length type) 3)
-	     (equal? 'array (car type))
-	     (number? (cadr type)))))
+	       (fx=? (length type) 3)
+	       (equal? 'array (car type))
+	       (number? (cadr type)))))
       
       (define construct-make-def
 	(lambda (struct-name member-spec member-details)
@@ -365,18 +383,23 @@
 		       ;;
 		       ;; hence,only scalar and pointer value can be set for a member
 		       (member-info
-			(map (lambda (member-spec)
-			       (with-syntax* ((field-name (datum->syntax #'name
-									 (car member-spec)))
-					      (field-getter (construct-name #'name
-									    #'type
-									    "-"
-									    #'field-name)))
-				 #'(ftype-set! struct-name
-					       (name field-name)
-					       obj
-					       (field-getter val-expr))))
-			     (cdr member-info)))
+			(filter identity
+				(map
+				 (lambda (member-spec)
+				   (with-syntax* ((field-name (datum->syntax #'name
+									     (car member-spec)))
+						  (field-getter (construct-name #'name
+										#'type
+										"-"
+										#'field-name)))
+				     (cond
+				      ;; don't generate setter for nested array types
+				      ((array-type? (syntax->datum (cdr member-spec))) #f)
+				      (else #'(ftype-set! struct-name
+							  (name field-name)
+							  obj
+							  (field-getter val-expr))))))
+				 (cdr member-info))))
 
 		       ;; array type
 		       ;; val-expr is expected to be a list
@@ -452,20 +475,25 @@
 			;; getters for struct fields
 			;; only one level of nesting handled
 			(member-types
-			 (with-syntax* (((getters ...)
-					 (map (lambda (member-spec)
-						(with-syntax* ((field-name (datum->syntax
-									    #'name
-									    (car member-spec)))
-							       (suffix
-								(construct-name #'struct-name
-										#'name
-										"-"
-										#'field-name)))
+			 (with-syntax*
+			     (((getters ...)
+			       (filter identity
+				       (map (lambda (member-spec)
+					      (with-syntax* ((field-name (datum->syntax
+									  #'name
+									  (car member-spec)))
+							     (suffix
+							      (construct-name #'struct-name
+									      #'name
+									      "-"
+									      #'field-name)))
+						(cond
+						 ((array-type? (cdr member-spec)) #f)
+						 (else 
 						  (construct-ptr-lambdas #'suffix
 									 (list #'name
-									       #'field-name))))
-					      (cdr member-types))))
+									       #'field-name))))))
+					    (cdr member-types)))))
 			   #'(begin getters ...)))
 
 			;; array types
@@ -498,9 +526,9 @@
 					 (map (lambda (type)
 						(display "type") (display type) (newline)
 						(let ((members (and (identifier? type)
-								  (not (member (syntax->datum type)
-									     scalar-type))
-								  (lookup type #'struct-info))))
+								    (not (member (syntax->datum type)
+										 scalar-type))
+								    (lookup type #'struct-info))))
 						  (cond
 						   (members
 						    (cons (syntax->datum type) members))

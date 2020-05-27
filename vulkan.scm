@@ -47,7 +47,7 @@
     (lambda ()
       (let* ((instance (init-vulkan))
 	     (_ (glfw-init))
-	     (window  (setup-window instance 1920 1080))
+	     (window  (setup-window instance 3840 2160))
 	     (surface (window-details-surface window))
 	     (physical-device (array-pointer-raw-ptr (get-physical-devices instance)))
 	     (queue-index (find-queue-family physical-device surface))

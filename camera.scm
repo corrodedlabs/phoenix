@@ -308,7 +308,7 @@
 	    (fovy 60.0)
 	    (aspect (fx/ screen-width screen-height))
 	    (near 0.1)
-	    (far 256.0))
+	    (far 1000.0))
 	(make-mvp-matrix  (rotate (diagonal-matrix4 1.0)
 				  (degree->radian (- 90.0))
 				  y-axis)

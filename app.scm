@@ -1,5 +1,6 @@
 #! /usr/bin/scheme
 
+(library-directories '("./thunderchez" "."))
 
 ;; (library (app)
 ;;   (export run))
@@ -11,9 +12,10 @@
 ;;   (lambda ()))
 (let ((state (setup-vulkan))
       (shaders (make-shaders "shaders/shader.vert" "shaders/shader.frag")))
-  (match-let* (((vertex-input-metadata . pipeline) (create-pipeline state
-								    shaders
-								    "models/cube.obj"))
+  (match-let* (((vertex-input-metadata . pipeline)
+		(create-pipeline state
+				 shaders
+				 "models/sampleroom.dae"))
 	       ((uniform-buffers . command-buffers) (create-buffers state
 								    vertex-input-metadata
 								    pipeline)))

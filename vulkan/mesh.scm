@@ -6,11 +6,19 @@
 (define model->vertex-input-metadata
   (case-lambda
    ((model-file)
-    (match (import-model model-file)
-      (($ model-data vertex-data indices-data)
-       (match vertex-data
-	 (($ vertex-buffer-data vertices normals uvs colors)
-	  (model->vertex-input-metadata vertices normals uvs colors indices-data))))))
+    (apply model->vertex-input-metadata
+	   (fold-left
+	    (lambda (data-acc mesh-data)
+	      (match-let* (((vertices0 normals0 uvs0 colors0 indices0) data-acc)
+			   (($ model-data vertex-data indices-data) mesh-data)
+			   (($ vertex-buffer-data vertices normals uvs colors) vertex-data))
+		(list (append vertices0 vertices)
+		      (append normals0 normals)
+		      (append uvs0 uvs)
+		      (append colors0 (or colors (list white-color)))
+		      (append indices0 indices-data))))
+	    '(() () () () ())
+	    (filter (lambda (m) (not (null? m))) (import-model model-file)))))
    ((vertices normals uvs colors indices-data)
     (define sizeof-vertex-input
       (lambda ()
@@ -22,10 +30,12 @@
 
     (define vertex-input->list
       (lambda ()
+	(displayln "length of vertices" (length vertices) "colors" (length colors) "uvs" (length uvs))
 	(apply append (map append
 			   vertices
 			   ;; normals
-			   (or colors (map (lambda (_) white-color) vertices))
+			   ;; todo colors not being captured
+			   (or  (map (lambda (_) white-color) vertices))
 			   uvs))))
 
     (define vertex-input-stride
@@ -47,6 +57,6 @@
 
 ;; usage
 
-;; (define input-metadata (create-vertex-input-metadata "models/box.obj"))
+;; (define input-metadata (model->vertex-input-metadata "models/box.obj"))
 
 ;; (length (vertex-input-metadata-vertices-list input-metadata))
