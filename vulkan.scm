@@ -78,10 +78,13 @@
 				    (queue-index queue-index)
 				    (queues queues)) state)
 		   ((@ vertex-input-metadata (vertices-list vertices)
-					     (indices indices)) vertex-input-metadata-obj)
+					     (indices indices)
+					     (components components)) vertex-input-metadata-obj)
 		   ((@ swapchain (image-views swapchain-image-views)
 				 (extent extent)) swapchain-obj)
 		   ((graphics-queue . present-queue) queues))
+	(displayln "indices length " (length indices)
+		   "vertices length" (length vertices))
 	(let* ((command-pool (create-command-pool device queue-index))
 	       (vertex-buffer (create-gpu-local-buffer physical-device
 						       device
@@ -125,7 +128,8 @@
 							index-buffer
 							framebuffers
 							descriptor-sets
-							(length indices)))))))
+							(length indices)
+							components))))))
 
   (define sync-objects (lambda (device) (init-sync-objects device)))
   

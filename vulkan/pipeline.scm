@@ -34,7 +34,12 @@
 
 ;; vertex input
 
-(define-record-type vertex-input-metadata (fields size vertices-list stride indices attrs))
+;; this will contain data about mesh component in a model
+(define-record-type mesh-component (fields index-count index-base))
+
+;; components is a array of #<mesh-component>
+(define-record-type vertex-input-metadata
+  (fields size vertices-list stride indices attrs components))
 
 ;; default vertex input struct
 (define-record-type vertex-input (fields position color texture-coord))

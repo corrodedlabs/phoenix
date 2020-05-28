@@ -322,7 +322,7 @@
   (define-syntax right (identifier-syntax 'right))
   (define-syntax left (identifier-syntax 'left))
 
-  (define *speed* 70.0)
+  (define *speed* 30.0)
   (define t0 (current-time))
 
   (define update-mvp-matrix

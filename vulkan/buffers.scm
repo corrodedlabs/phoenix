@@ -128,7 +128,7 @@
 
 (define create-command-buffers
   (lambda (device swapchain command-pool pipeline vertex-buffer index-buffer framebuffers
-		  descriptor-sets indices-length)
+	     descriptor-sets indices-length components)
 
     (define clear-values (list 0.025 0.025 0.025 1.0))
 
@@ -177,8 +177,15 @@
 	  			       descriptor-set
 	  			       0
 	  			       (null-pointer u32))
-	  (vk-cmd-draw cmd-buffer indices-length 1 0 0 )
-	  (vk-cmd-end-render-pass cmd-buffer)
+	  (for-each (lambda (component)
+	  	      (vk-cmd-draw-indexed cmd-buffer
+	  				   (mesh-component-index-count component)
+	  				   1
+	  				   0
+	  				   (mesh-component-index-base component)
+	  				   0))
+	  	    components)
+	  (vk-cmd-end-render-pass cmd-buffer) 
 	  cmd-buffer)))
 
     (let ((clear-values (clear-values-ptr))
@@ -268,7 +275,6 @@
 			(vk-memory-requirements-size memory-requirements)
 			memory-index))
 	   (memory (make-foreign-object vk-device-memory)))
-      (displayln "Alloc size" (vk-memory-requirements-size memory-requirements))
       (vk-allocate-memory device alloc-info 0 memory)
       memory)))
 
@@ -342,7 +348,6 @@
        ((number? (car data))
 	(list->u32-pointer-array
 	 (map-indexed (lambda (value i)
-			(displayln "setting value" value)
 			(let ((ptr (make-foreign-object u32)))
 			  (ftype-set! u32 () ptr value)
 			  ptr)) 

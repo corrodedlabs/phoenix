@@ -219,16 +219,15 @@
 
 ;; record to collect vertex buffer data
 (define-record-type vertex-buffer-data (fields vertices normals uv colors))
-(define f #f)
+
 (define (mesh-ptr->vertex-buffer-data mesh-ptr)
-  (set! f mesh-ptr)
   (let* ((num-vertices (mesh-num-vertices mesh-ptr))
 
 	 (vertices
-	  ;; (map flip-vertices)
-	  (vector3-array-ptr->list (make-array-pointer num-vertices
-						       (mesh-vertices mesh-ptr)
-						       'vector3)))
+	  (map flip-vertices
+	       (vector3-array-ptr->list (make-array-pointer num-vertices
+							    (mesh-vertices mesh-ptr)
+							    'vector3))))
 	 (normals
 	  (vector3-array-ptr->list (make-array-pointer num-vertices
 						       (mesh-normals mesh-ptr)
@@ -254,11 +253,11 @@
 
 ;; data for index buffer
 (define mesh-ptr->indices
-  (lambda (mesh-ptr)     
+  (lambda (mesh-ptr vertex-offset)     
     (displayln "num of faces is " (mesh-num-faces mesh-ptr))
     (concatenate (face-pointer-map
 		  (lambda (face-ptr)
-		    (unsigned-pointer-map (lambda (x) (read-unsigned x))
+		    (unsigned-pointer-map (lambda (x) (+ vertex-offset (read-unsigned x)))
 					  (make-array-pointer (face-num-indices face-ptr)
 							      (face-indices face-ptr)
 							      'unsigned)))
@@ -287,18 +286,17 @@
   (lambda (model)
 
     (define mesh-ptr->model-data
-      (lambda (mesh-ptr)
-	(displayln "mesh name is" mesh-ptr)
+      (lambda (mesh-ptr vertex-offset)
 	(let ((vertex-data (mesh-ptr->vertex-buffer-data mesh-ptr))
-	      (indices (mesh-ptr->indices mesh-ptr)))
+	      (indices (mesh-ptr->indices mesh-ptr vertex-offset)))
 	  (make-model-data vertex-data indices))))
 
     (define mesh-indices->model-data
-      (lambda (mesh-indices mesh-list)
-	(displayln "mesh indices ptr" mesh-indices)
+      (lambda (mesh-indices mesh-list vertex-offset)
 	(unsigned-pointer-map (lambda (mesh-index)
 				(mesh-ptr->model-data (list-ref mesh-list
-								(read-unsigned mesh-index))))
+								(read-unsigned mesh-index))
+						      vertex-offset))
 			      mesh-indices)))
 
     (define process-node
@@ -308,23 +306,29 @@
 	       (num-children (node-num-children node-ptr))
 	       (child-nodes (double-pointer->list (node-children node-ptr)
 						  node
-						  num-children)))
-	  (let ((current-mesh-data (mesh-indices->model-data mesh-indices meshes-list)))
+						  num-children))
+	       (vertex-offset (fold-left (lambda (offset model-data)
+					   (+ offset
+					      (length (vertex-buffer-data-vertices
+						       (model-data-vertex-data model-data)))))
+					 0
+					 collected-mesh-data)))
+	  (let ((current-mesh-data (mesh-indices->model-data mesh-indices
+							     meshes-list
+							     vertex-offset)))
 	    (fold-left (lambda (data child-node-ptr)
 			 (process-node child-node-ptr meshes-list data))
 		       (append collected-mesh-data current-mesh-data)
 		       child-nodes)))))
     
     (let* ((scene-ptr (import_file model
-				   (bitwise-ior flip-winding-order
+				   (bitwise-ior pretransform-vertices
 						triangulate
-						pretransform-vertices
-						calc-tangent-space
-						gen-smooth-normals
-						make-left-handed)))
+						gen-normals)))
 	   (meshes-list (double-pointer->list (scene-meshes scene-ptr)
 					      mesh
 					      (scene-num-meshes scene-ptr))))
+      (displayln "scene meshes " (scene-num-meshes scene-ptr))
       (process-node (scene-root-node scene-ptr) meshes-list (list)))))
 
 ;; Example usage:
