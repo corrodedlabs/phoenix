@@ -132,5 +132,5 @@
 
 ;; (load "shaderc.scm")
 ;; (import (shaderc))
-;; (compile-shaders "shaders/shader.vert" shaderc-vertex-shader)
+;; (define x (compile-shaders "shaders/shader.vert" shaderc-vertex-shader))
 ;; (compile-shaders "shaders/shader.frag" shaderc-fragment-shader)

@@ -8,6 +8,8 @@
 	(vulkan)
 	(matchable))
 
+(define state (setup-vulkan))
+
 ;; (define run
 ;;   (lambda ()))
 (let ((state (setup-vulkan))

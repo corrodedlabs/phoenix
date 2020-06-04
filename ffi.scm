@@ -177,8 +177,11 @@
 
   (define-syntax make-foreign-array
     (syntax-rules ()
-      ((_ struct size) (make-ftype-pointer struct (unbox (malloc (* size
-								    (ftype-sizeof struct))))))))
+      ((_ struct size) (make-ftype-pointer struct
+					   (if (equal? size 0)
+					       0
+					       (unbox (malloc (* size
+								 (ftype-sizeof struct)))))))))
 
   (define-syntax pointer-ref-value
     (syntax-rules ()
@@ -355,9 +358,9 @@
       (define array-type?
 	(lambda (type)
 	  (and (list? type)
-	       (fx=? (length type) 3)
-	       (equal? 'array (car type))
-	       (number? (cadr type)))))
+	     (fx=? (length type) 3)
+	     (equal? 'array (car type))
+	     (number? (cadr type)))))
       
       (define construct-make-def
 	(lambda (struct-name member-spec member-details)

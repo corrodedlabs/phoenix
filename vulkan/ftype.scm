@@ -939,6 +939,8 @@
    (dst-access-mask . flags)
    (dependency-flags . flags)))
 
+(define-collection-lambdas vk-subpass-dependency)
+
 (define-vulkan-struct vk-render-pass-create-info
   ((flags . flags)
    (attachment-count . unsigned-32)
