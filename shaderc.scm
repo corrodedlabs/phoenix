@@ -57,6 +57,15 @@
     shaderc-compilation-status-validation-error
     shaderc-compilation-status-configuration-error)
 
+  (define _get-error-message
+    (foreign-procedure "shaderc_result_get_error_message" ((* shaderc-compilation-result)) string))
+
+  (define _get-num-warnings
+    (foreign-procedure "shaderc_result_get_num_warnings" ((* shaderc-compilation-result)) size_t))
+
+  (define _get-num-errors
+    (foreign-procedure "shaderc_result_get_num_errors" ((* shaderc-compilation-result)) size_t))
+
   (define _get-compilation-status
     (foreign-procedure "shaderc_result_get_compilation_status"
 		       ((* shaderc-compilation-result)) shaderc-compilation-status))
@@ -112,7 +121,13 @@
 	  (make-array-pointer (_get-result-length result)
 			      (_get-result-bytes result)
 			      'unsigned-32))
-	 (else (error "shader compilation failed: " (_get-compilation-status result))))))))
+	 (else (let ((num-errors (_get-num-errors result))
+		     (num-warnings (_get-num-warnings result))
+		     (error-message (_get-error-message result)))
+		 (display "Num errors: ") (display num-errors) (newline)
+		 (display "Num warnings: ") (display num-warnings) (newline)
+		 (display "Error message: ") (display error-message) (newline)
+		 (error "shader compilation failed: " (_get-compilation-status result)))))))))
 
 
 ;; (load "shaderc.scm")
