@@ -152,13 +152,17 @@
 								     (cdr attr)))
 		       attrs)))))
     
-    (make-vk-pipeline-vertex-input-state-create-info pipeline-vertex-input-state-create-info
-						     0
-						     0
-						     1
-						     (make-vertex-binding-description)
-						     (length attrs)
-						     (make-attribute-descriptions))))
+    (let ((binding-count (if (null? attrs) 0 1))
+	  (binding-description (if (null? attrs)
+				   (null-pointer vk-vertex-input-binding-description)
+				   (make-vertex-binding-description))))
+      (make-vk-pipeline-vertex-input-state-create-info pipeline-vertex-input-state-create-info
+						       0
+						       0
+						       binding-count
+						       binding-description
+						       (length attrs)
+						       (make-attribute-descriptions)))))
 
 
 ;; input assembly

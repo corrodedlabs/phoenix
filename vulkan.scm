@@ -1,5 +1,5 @@
 (define-record-type vulkan-state
-  (fields window surface physical-device queue-index device queues swapchain))
+  (fields window surface physical-device queue-index device queues swapchain command-pool))
 
 (define setup-vulkan
   (lambda ()
@@ -11,9 +11,10 @@
 	   (queue-index (find-queue-family physical-device surface))
 	   (device (create-logical-device physical-device queue-index))
 	   (queues (create-queue-handles device))
-	   (swapchain-details (create-swapchain physical-device device surface queue-index)))
+	   (swapchain-details (create-swapchain physical-device device surface queue-index))
+	   (command-pool (create-command-pool device queue-index)))
       (make-vulkan-state window surface physical-device queue-index device queues
-			 swapchain-details))))
+			 swapchain-details command-pool))))
 
 ;; returns a cons cell of (vertex-input-metadata . graphics-pipeline)
 (define create-pipeline
@@ -39,14 +40,15 @@
 	(cons vertex-input-metadata
 	      (create-graphics-pipeline physical-device device pipeline-data))))))
 
-;; returns a cons cell of (uniform-buffers . command-buffers)
+;; returns a list of ( command-pool command-buffers uniform-buffers)
 (define create-buffers
   (lambda (state vertex-input-metadata-obj pipeline)
     (match-let* (((@ vulkan-state (physical-device physical-device)
 				  (device device)
 				  (swapchain swapchain-obj)
 				  (queue-index queue-index)
-				  (queues queues)) state)
+				  (queues queues)
+				  (command-pool command-pool)) state)
 		 ((@ vertex-input-metadata (vertices-list vertices)
 					   (indices indices)
 					   (components components)) vertex-input-metadata-obj)
@@ -55,8 +57,7 @@
 		 ((graphics-queue . present-queue) queues))
       (displayln "indices length " (length indices)
 		 "vertices length" (length vertices))
-      (let* ((command-pool (create-command-pool device queue-index))
-	     (vertex-buffer (create-gpu-local-buffer physical-device
+      (let* ((vertex-buffer (create-gpu-local-buffer physical-device
 						     device
 						     graphics-queue
 						     command-pool
@@ -68,12 +69,12 @@
 						    command-pool
 						    indices
 						    vk-buffer-usage-index-buffer-bit))
-	     (framebuffers (create-framebuffers physical-device
-						device
-						command-pool
-						graphics-queue
-						swapchain-obj
-						pipeline))
+	     (framebuffers (create-framebuffers-for-swapchain physical-device
+							      device
+							      command-pool
+							      graphics-queue
+							      swapchain-obj
+							      pipeline))
 	     (framebuffer-size (length framebuffers))
 	     (uniform-buffers (create-uniform-buffers physical-device
 						      device
@@ -90,16 +91,17 @@
 						      (pipeline-descriptor-set-layout pipeline)
 						      uniform-buffers
 						      texture-data)))
-	(cons uniform-buffers (create-command-buffers device
-						      swapchain-obj
-						      command-pool
-						      pipeline
-						      vertex-buffer
-						      index-buffer
-						      framebuffers
-						      descriptor-sets
-						      (length indices)
-						      components))))))
+	(cons (create-command-buffers device
+				      swapchain-obj
+				      command-pool
+				      pipeline
+				      vertex-buffer
+				      index-buffer
+				      framebuffers
+				      descriptor-sets
+				      (length indices)
+				      components)
+	      uniform-buffers)))))
 
 (define sync-objects (lambda (device) (init-sync-objects device)))
 

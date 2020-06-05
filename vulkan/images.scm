@@ -83,10 +83,15 @@
    ((texture-width texture-height)
     (create-image-property-for-texture texture-width texture-height vk-format-r8g8b8a8-unorm))
    ((texture-width texture-height format)
+    (create-image-property-for-texture texture-width
+				       texture-height
+				       format
+				       vk-image-usage-transfer-dst-bit))
+   ((texture-width texture-height format usage)
     (make-image-properties texture-width
 			   texture-height
 			   format
-			   (bitwise-ior vk-image-usage-transfer-dst-bit
+			   (bitwise-ior usage
 					vk-image-usage-sampled-bit)
 			   vk-image-aspect-color-bit))))
 

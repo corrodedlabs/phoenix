@@ -3,17 +3,24 @@
 (define state (setup-vulkan))
 (define device (vulkan-state-device state))
 (define physical-device (vulkan-state-physical-device state))
+(define cmd-pool (vulkan-state-command-pool state))
+
+(define graphics-queue (car (vulkan-state-queues state)))
 
 ;; brdf material pipeline
 
 (define +dimension+ 512)
 (define +format+ vk-format-r16g16-sfloat)
 
+(define +dimension-extent+ (make-vk-extent-2d +dimension+ +dimension+))
+
 (define create-image
   (lambda ()
-    (let* ((image-property (create-image-property-for-texture +dimension+
-							      +dimension+
-							      +format+))
+    (let* ((image-property
+	    (create-image-property-for-texture +dimension+
+					       +dimension+
+					       +format+
+					       vk-image-usage-color-attachment-bit))
 	   (image-handle (create-image-handle device image-property))
 	   (image-memory (allocate-memory-for-image physical-device device image-handle)))
       (make-gpu-image image-handle
@@ -71,10 +78,11 @@
 
 (define pbr-texture-data (create-pbr-texture))
 
+(define render-pass (brdf-render-pass))
+
 (define generate-brdf-pipeline
-  (lambda ()
-    (let ((render-pass (brdf-render-pass))
-	  (descriptor-layout
+  (lambda (render-pass)
+    (let ((descriptor-layout
 	   (create-descriptor-layout device
 				     (make-array-pointer 0
 							 (null-pointer
@@ -87,11 +95,36 @@
       (create-graphics-pipeline physical-device device
 				(make-pipeline-data (make-shaders "shaders/brdf.vert"
 								  "shaders/brdf.frag")
-						    (make-vertex-input-details ''() 0 '())
+						    (make-vertex-input-details '() 0 '())
 						    render-pass
 						    descriptor-layout
 						    rasterization-state
 						    depth-stencil-state
-						    (make-vk-extent-2d +dimension+ +dimension+))))))
+						    +dimension-extent+)))))
 
-(define brdf-pipeline (generate-brdf-pipeline))
+(define brdf-pipeline (generate-brdf-pipeline render-pass))
+
+(define framebuffer (create-framebuffer device
+					render-pass
+					(make-vk-extent-2d +dimension+ +dimension+)
+					(texture-data-image-view pbr-texture-data)))
+
+(define clear-values (list 0.0 0.0 0.0 1.0))
+(define clear-values-ptr (list->vk-clear-value-pointer-array
+			  (list (make-vk-clear-value clear-values))))
+
+(execute-command-buffer device
+			cmd-pool
+			graphics-queue
+			#t
+			(lambda (command-buffer)
+			  (let ((render-area
+				 (make-render-area '(0 . 0)
+						   (cons +dimension+ +dimension+))))
+			    (perform-render-pass (make-render-pass-data command-buffer
+									framebuffer
+									render-area
+									clear-values-ptr
+									brdf-pipeline)
+						 (lambda ()
+						   (vk-cmd-draw command-buffer 3 1 0 0))))))
