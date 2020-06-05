@@ -207,9 +207,9 @@
 						       0
 						       vk-false
 						       vk-false
-						       vk-polygon-mode-fill
-						       vk-cull-mode-back-bit
-						       vk-front-face-clockwise
+						       polygon-mode
+						       cull-mode
+						       front-face
 						       vk-false
 						       0.0
 						       0.0
