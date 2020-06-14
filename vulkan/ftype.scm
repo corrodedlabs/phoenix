@@ -57,10 +57,25 @@
 		      (cons (list (car str)) dest))))))))
 
 
-(trace-define-syntax define-vulkan-command
-  (lambda (stx)
-    (syntax-case stx ()
+(define-syntax vk-result-lambda
+  (syntax-rules ()
+    ((_ command-name ffi-proc (arg-names ...))
+     (lambda (arg-names ...)
+       (let ((res (ffi-proc arg-names ...)))
+	 (case res
+	   ((0) #t)
+	   (else (error "vulkan command failed" command-name res))))))))
+
+(define-syntax void-lambda
+  (syntax-rules ()
+    ((_ ffi-proc (arg-names ...)) (lambda (arg-names ...) (ffi-proc arg-names ...)))))
+
+(define-syntax define-vulkan-command
+  (lambda (stx) 
+    (syntax-case stx ()      
       [(_ command (argument-types ...))
+       #'(define-vulkan-command command (argument-types ...) int)]
+      [(_ command (argument-types ...) return-type)
        (let ((command-string (symbol->string (syntax->datum #'command))))
 	 (with-syntax ((command-name (datum->syntax #'command
 						    command-string))
@@ -72,15 +87,15 @@
 						 (camel-case->kebab-case command-string))))
 		       ((arg-names ...) (map (lambda (t) (datum->syntax #'command (gensym)))
 					   #'(argument-types ...))))
-	   #'(begin (define _ffi-proc
-		      (foreign-procedure command-name (argument-types ...) int))
+	   (with-syntax ((body (case (syntax->datum #'return-type)
+				 ((void) #'(void-lambda _ffi-proc (arg-names ...)))
+				 ((int) #'(vk-result-lambda command-name
+							    _ffi-proc
+							    (arg-names ...))))))
+	     #'(begin (define _ffi-proc
+			(foreign-procedure command-name (argument-types ...) return-type))
 
-		    (define ffi-proc
-		      (lambda (arg-names ...)
-			(let ((res (_ffi-proc arg-names ...)))
-			  (case res
-			    ((0) #t)
-			    (else (error "vulkan command failed" command-name res)))))))))])))
+		      (define ffi-proc body)))))])))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;
@@ -1468,7 +1483,7 @@
 (define-vulkan-command vkCreateFence
   ((& vk-device) (* vk-fence-create-info) uptr (* vk-fence)))
 
-(define-vulkan-command vkDestroyFence ((& vk-device) (& vk-fence) uptr))
+(define-vulkan-command vkDestroyFence ((& vk-device) (& vk-fence) uptr) void)
 (define-vulkan-command vkResetFences ((& vk-device) u32 (* vk-fence)))
 (define-vulkan-command vkGetFenceStatus ((& vk-device) (& vk-fence)))
 (define-vulkan-command vkWaitForFences ((& vk-device) u32 (* vk-fence) vk-bool32 u64))

@@ -14,12 +14,15 @@
 	  load-glfw)
 
   (import (chezscheme)
+	  (prelude)
 	  (ffi)
 	  (glfw glfw))
 
   (define load-glfw (lambda ()
 		      (display "loading glfw") (newline)
-		      (load-shared-object "libglfw.so")))
+		      (load-shared-library (make-library-detail #f
+								"libglfw.so"
+								"phoenix-libs/glfw3.dll"))))
   (define lib (load-glfw))
 
   (define glfw-init (foreign-procedure "glfwInit" () boolean))

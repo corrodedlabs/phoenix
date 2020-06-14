@@ -11,7 +11,7 @@
 	  model-data-vertex-data
 	  model-data-indices)
   (import (chezscheme)
-	  (ffi)
-	  (prelude))
+		  (ffi)
+		  (prelude))
 
   (include "assimp.scm"))

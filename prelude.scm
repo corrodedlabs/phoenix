@@ -1,59 +1,86 @@
 (library (prelude)
   
   (export identity
-	  construct-name
-	  displayln
-	  map-indexed
-	  take
-	  kebab-case->camel-case
+    construct-name
+    displayln
+    map-indexed
+    take
+    kebab-case->camel-case
 
-	  define-interface
-	  define-module
-	  abstract-module
-	  implement)
+    define-interface
+    define-module
+    abstract-module
+    implement
+    make-library-detail
+    load-shared-library)
 
-  (import (chezscheme))
+  (import (chezscheme)
+          (matchable))
 
   (define identity (lambda (x) x))
 
   (define construct-name
     (lambda (template-identifier . args)
       (datum->syntax template-identifier
-		     (string->symbol (apply string-append
-					    (map (lambda (x)
-						   (if (string? x)
-						       x
-						       (symbol->string (syntax->datum x))))
-						 args))))))
+         (string->symbol (apply string-append
+                          (map (lambda (x)
+                                (if (string? x)
+                                    x
+                                    (symbol->string (syntax->datum x))))
+                           args))))))
 
   (define map-indexed
     (lambda (f arr)
       (let lp ((i 0)
-	       (xs arr)
-	       (coll '()))
-	(cond
-	 ((null? xs) (reverse coll))
-	 (else (lp (+ i 1)
-		   (cdr xs)
-		   (cons (f (car xs) i) coll)))))))
+               (xs arr)
+               (coll '()))
+       (cond
+        ((null? xs) (reverse coll))
+        (else (lp (+ i 1)
+               (cdr xs)
+               (cons (f (car xs) i) coll)))))))
 
   (define take
     (lambda (list pos)
       (let ((vec (list->vector list)))
-	(map (lambda (i) (vector-ref vec i)) (iota pos)))))
+       (map (lambda (i) (vector-ref vec i)) (iota pos)))))
 
   (define kebab-case->camel-case
     (lambda (str)
       (let lp ((str  (string->list str))
-	       (dest '()))
-	(cond
-	 ((null? str) (list->string (reverse dest))) 
-	 
-	 ((char=? (car str) #\-) (lp (cddr str)
-				     (cons (char-upcase (cadr str)) dest)))
-	 
-	 (else (lp (cdr str)
-		   (cons (car str) dest)))))))
+               (dest '()))
+       (cond
+        ((null? str) (list->string (reverse dest))) 
+   
+        ((char=? (car str) #\-) (lp (cddr str)
+                                 (cons (char-upcase (cadr str)) dest)))
+   
+        (else (lp (cdr str)
+               (cons (car str) dest)))))))
+
+  (define-record-type library-detail (fields osx linux windows))
+
+  (define load-shared-library 
+    (lambda (lib-detail)
+
+      (define with-defaults 
+        (lambda (lib)
+          "if lib is not a pair then create a pair with the passed lib"
+          (if (pair? lib) lib (cons lib lib))))
+
+      (match-let* ((($ library-detail osx linux windows) lib-detail)
+                   ((osx-32 . osx-64) (with-defaults osx))
+                   ((linux-32 . linux-64) (with-defaults linux))
+                   ((win-32 . win-64) (with-defaults windows)))
+        (case (machine-type)
+          ((i3osx ti3osx) (load-shared-object osx-32))
+          ((a6osx ta6osx) (load-shared-object osx-64))
+          ((i3le  ti3le)  (load-shared-object linux-32))
+          ((a6le  ta6le)  (load-shared-object linux-64))
+          ((i3nt  ti3nt)  (load-shared-object win-32))
+          ((a6nt  ta6nt)  (load-shared-object win-64))))))
+
+
 
   ;; Modules
 
@@ -87,12 +114,12 @@
     (syntax-rules ()
       [(_ name (export ...))
        (define-syntax name
-	 (lambda (x)
-	   (syntax-case x ()
-	     [(_ n defs)
-	      (with-implicit (n export ...)
-			     #'(module n (export ...) .
-				       defs))])))]))
+        (lambda (x)
+          (syntax-case x ()
+            [(_ n defs)
+             (with-implicit (n export ...)
+                #'(module n (export ...) .
+                    defs))])))]))
 
   (define-syntax define-module
     (syntax-rules ()
@@ -166,8 +193,8 @@
     (syntax-rules ()
       [(_ name (ex ...) (kwd ...) defn ...)
        (module name (ex ... kwd ...)
-	       (declare ex) ...
-	       defn ...)]))
+         (declare ex) ...
+         defn ...)]))
 
   (define-syntax implement
     (syntax-rules ()
