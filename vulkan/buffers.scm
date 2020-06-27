@@ -190,17 +190,9 @@
 							  ptr))
 						      (list 0))))))
 	  (perform-render-pass
-	   (make-render-pass-data cmd-buffer
-				  framebuffer
-				  render-area
-				  clear-values
-				  pipeline)
+	   (make-render-pass-data cmd-buffer framebuffer render-area clear-values pipeline)
 	   (lambda ()
-	     (vk-cmd-bind-vertex-buffers cmd-buffer
-					 0
-					 1
-					 vertex-buffers
-					 offsets)
+	     (vk-cmd-bind-vertex-buffers cmd-buffer 0 1 vertex-buffers offsets)
 	     (vk-cmd-bind-index-buffer cmd-buffer
 				       (buffer-handle index-buffer)
 				       0
@@ -430,6 +422,10 @@
       (make-buffer gpu-buffer-ptr memory size))))
 
 
+;; descriptor state data
+;; buffer data for writing descriptor sets
+(define-record-type descriptor-set-data (fields uniform-buffers textures))
+
 ;; Uniform buffers
 
 (define-record-type uniform-buffer-data (fields model view projection))
@@ -442,21 +438,16 @@
     (calculate-mvp-matrix width height)))
 
 
-
 (define create-uniform-buffers
   (lambda (physical-device device data num-buffers)
     (map (lambda (i)
-	   (cons (create-host-buffer physical-device
-				     device
-				     (uniform-buffer-data->list data)
-				     vk-buffer-usage-uniform-buffer-bit)
-		 data))
+	   (create-host-buffer physical-device device data vk-buffer-usage-uniform-buffer-bit))
 	 (iota num-buffers))))
 
 (define update-uniform-buffer
   (lambda (device uniform-buffer matrix eye-position movement-direction)
     ;; (displayln "uniform buffer" uniform-buffer "matrix" matrix "eye position" eye-position)
-    (match  (car uniform-buffer)
+    (match uniform-buffer
       (($ buffer handle memory size)
        (match (update-mvp-matrix matrix eye-position movement-direction)
 	 ((matrix . eye)
@@ -466,6 +457,16 @@
 	  (cons matrix eye))))
       (else (error "unifor buffer not valid" uniform-buffer)))))
 
+
+(define-record-type lights-data (fields positions exposure gamma))
+
+(define (lights-data->list data)
+  (match data
+    (($ lights-data positions exposure gamma)
+     (append positions (list exposure gamma)))))
+
+(define default-light-data (make-lights-data '(0 0 0 0 0 0 0 0) 4.5 2.5))
+
 ;; Descriptor sets and pools
 
 ;; used to pass on data like uniform buffers and textures to the shaders
@@ -473,10 +474,10 @@
 (define create-descriptor-pool
   (lambda (device descriptor-count)
     (let* ((uniform-buffer-pool-size (make-vk-descriptor-pool-size vk-descriptor-type-uniform-buffer
-								   descriptor-count))
+								   (* descriptor-count 2)))
 	   (image-sampler-pool-size
 	    (make-vk-descriptor-pool-size vk-descriptor-type-combined-image-sampler
-					  descriptor-count))
+					  (* descriptor-count 8)))
 	   (pool-size-ptr (list->vk-descriptor-pool-size-pointer-array
 			   (list uniform-buffer-pool-size image-sampler-pool-size)))
 	   (info (make-vk-descriptor-pool-create-info descriptor-pool-create-info 0 0
@@ -489,7 +490,7 @@
 
 
 (define create-descriptor-sets
-  (lambda (device descriptor-pool descriptor-layout uniform-buffers texture-data)
+  (lambda (device descriptor-pool descriptor-layout uniform-buffers textures-data)
     
     (define allocate-descriptor-sets
       (lambda (num-sets)
@@ -508,44 +509,61 @@
 
     (let* ((num-sets (length uniform-buffers))
 	   ;; todo can be optimized further
-	   (ubo-size (sizeof-scheme-data (uniform-buffer-data->list (cdar uniform-buffers))))
+	   (camera-ubo-size (sizeof-scheme-data (caar uniform-buffers)))
+	   (light-ubo-size (sizeof-scheme-data (cadar uniform-buffers)))
 	   (descriptor-sets  (allocate-descriptor-sets num-sets)))
       (displayln "ubo size is" ubo-size)
-      (map (lambda (uniform-buffer descriptor-set)
-	     (let* ((buffer-info
-		     (make-vk-descriptor-buffer-info (pointer-ref-value uniform-buffer)
+      (map (lambda (camera-uniform-buffer lights-uniform-buffer descriptor-set)
+	     (let* ((camera-buffer-info
+		     (make-vk-descriptor-buffer-info (pointer-ref-value camera-uniform-buffer)
 						     0
-						     ubo-size))
-		    (image-info
-		     (make-vk-descriptor-image-info
-		      (pointer-ref-value (texture-data-sampler texture-data))
-		      (pointer-ref-value (texture-data-image-view texture-data))
-		      vk-image-layout-shader-read-only-optimal))
-		    (uniform-buffer-write
-		     (make-vk-write-descriptor-set write-descriptor-set
-						   0
-						   (pointer-ref-value descriptor-set)
-						   0
-						   0
-						   1
-						   vk-descriptor-type-uniform-buffer
-						   (null-pointer vk-descriptor-image-info)
-						   buffer-info
-						   (null-pointer vk-buffer-view)))
-		    (combined-image-sampler-write
-		     (make-vk-write-descriptor-set write-descriptor-set
-						   0
-						   (pointer-ref-value descriptor-set)
-						   1
-						   0
-						   1
-						   vk-descriptor-type-combined-image-sampler
-						   image-info
-						   (null-pointer vk-descriptor-buffer-info)
-						   (null-pointer vk-buffer-view)))
-		    (write
-		     (list->vk-write-descriptor-set-pointer-array
-		      (list uniform-buffer-write combined-image-sampler-write))))
+						     camera-ubo-size))
+		    (lights-buffer-info
+		     (make-vk-descriptor-buffer-info (pointer-ref-value lights-uniform-buffer)
+						     0
+						     light-ubo-size))
+		    (image-infos
+		     (map (lambda (texture-data)
+			    (make-vk-descriptor-image-info (pointer-ref-value
+							    (texture-data-sampler texture-data))
+							   (pointer-ref-value
+							    (texture-data-image-view texture-data))
+							   vk-image-layout-shader-read-only-optimal))
+			  (cons pbr-texture-data textures-data)))
+		    
+		    (uniform-buffer-writes
+		     (map-indexed (lambda (buffer-info index)
+				    (make-vk-write-descriptor-set write-descriptor-set
+								  0
+								  (pointer-ref-value descriptor-set)
+								  index
+								  0
+								  1
+								  vk-descriptor-type-uniform-buffer
+								  (null-pointer vk-descriptor-image-info)
+								  camera-buffer-info
+								  (null-pointer vk-buffer-view)))
+				  (list camera-buffer-info lights-buffer-info)))
+		    
+		    (combined-image-sampler-writes
+		     (map-indexed
+		      (lambda (image-info index)
+			(make-vk-write-descriptor-set write-descriptor-set
+						      0
+						      (pointer-ref-value descriptor-set)
+						      ;; first two filled by uniform buffer writes
+						      (+ 2 index)
+						      0
+						      1
+						      vk-descriptor-type-combined-image-sampler
+						      image-info
+						      (null-pointer vk-descriptor-buffer-info)
+						      (null-pointer vk-buffer-view)))
+		      image-infos))
+		    
+		    (write (list->vk-write-descriptor-set-pointer-array
+			    (append uniform-buffer-writes combined-image-sampler-write))))
+	       
 	       (vk-update-descriptor-sets device
 					  (array-pointer-length write)
 					  (array-pointer-raw-ptr write)
@@ -553,6 +571,7 @@
 					  0)
 	       descriptor-set))
 	   (map (lambda (buf) (buffer-handle (car buf)))  uniform-buffers)
+	   (map (lambda (buf) (buffer-handle (cdr buf))) uniform-buffers)
 	   (vk-descriptor-set-pointer-map (lambda (x) x) descriptor-sets)))))
 
 

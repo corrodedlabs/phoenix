@@ -27,6 +27,7 @@
 	  array-pointer-raw-ptr
 	  array-pointer-empty?
 	  array-pointer?
+	  new-array-pointer
 	  with-new-array-pointer
 	  pointer-ref-value
 	  pointer-ref-ftype
@@ -237,6 +238,15 @@
 
   (define-record-type array-pointer (fields length raw-ptr type) (nongenerative))
 
+
+  (define-syntax new-array-pointer
+    (syntax-rules ()
+      ((_ pointer-type count)
+       (make-array-pointer count
+			   (make-foreign-array pointer-type count)
+			   pointer-type))))
+
+  ;; notice: this should not be here belongs somewhere inside vulkan library
   ;; this function covers a general pattern for vulkan functions to return an array
   ;; the f provided will be called two times:
   ;; once for the value of count and then
@@ -285,10 +295,10 @@
 
 		      (else (lp (fx+ 1 i)
 				(cons (and (array-pointer-raw-ptr arr-ptr)
-					 (f (ftype-&ref pointer-type
-							()
-							(array-pointer-raw-ptr arr-ptr)
-							i)))
+					   (f (ftype-&ref pointer-type
+							  ()
+							  (array-pointer-raw-ptr arr-ptr)
+							  i)))
 				      xs)))))))
 
 	       (define find-lambda
@@ -358,9 +368,9 @@
       (define array-type?
 	(lambda (type)
 	  (and (list? type)
-	     (fx=? (length type) 3)
-	     (equal? 'array (car type))
-	     (number? (cadr type)))))
+	       (fx=? (length type) 3)
+	       (equal? 'array (car type))
+	       (number? (cadr type)))))
       
       (define construct-make-def
 	(lambda (struct-name member-spec member-details)

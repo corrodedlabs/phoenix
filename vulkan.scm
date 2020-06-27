@@ -16,6 +16,33 @@
       (make-vulkan-state window surface physical-device queue-index device queues
 			 swapchain-details command-pool))))
 
+(define configure-descriptor-layout
+  (lambda (device)
+
+    (define fragement-sampler-binding
+      (lambda (binding-index)
+	(make-vk-descriptor-set-layout-binding binding-index
+					       vk-descriptor-type-combined-image-sampler
+					       1
+					       vk-shader-stage-fragment-bit
+					       (null-pointer vk-sampler))))
+
+    (define uniform-buffer-binding
+      (lambda (binding-index stage)
+	(make-vk-descriptor-set-layout-binding binding-index
+					       vk-descriptor-type-uniform-buffer
+					       1
+					       stage
+					       (null-pointer vk-sampler))))
+    
+    (let* ((uniform-buffer-binding (uniform-buffer-binding 0 (bitwise-ior vk-shader-stage-vertex-bit
+									  vk-shader-stage-fragment-bit)))
+	   (light-info-binding (uniform-buffer-binding 1 vk-shader-stage-fragment-bit))
+	   (texture-sampler-bindings (map fragment-sampler-binding (cddr (iota 10))))
+	   (bindings (list->vk-descriptor-set-layout-binding-pointer-array
+		      (append (list uniform-buffer-binding light-info-binding) bindings))))
+      (create-descriptor-layout device bindings))))
+
 ;; returns a cons cell of (vertex-input-metadata . graphics-pipeline)
 (define create-pipeline
   (lambda (state shaders model-filename)
@@ -37,8 +64,12 @@
 						depth-state
 						#t
 						(swapchain-extent swapchain))))
-	(cons vertex-input-metadata
-	      (create-graphics-pipeline physical-device device pipeline-data))))))
+	(cons (create-graphics-pipeline physical-device device pipeline-data)
+	      vertex-input-metadata)))))
+
+;; descriptor data
+
+
 
 ;; returns a list of ( command-pool command-buffers uniform-buffers)
 (define create-buffers
@@ -76,21 +107,62 @@
 							      swapchain-obj
 							      pipeline))
 	     (framebuffer-size (length framebuffers))
-	     (uniform-buffers (create-uniform-buffers physical-device
-						      device
-						      (extent->uniform-buffer-data extent)
-						      framebuffer-size))
-	     (texture-data (create-texture-data physical-device
-						device
-						command-pool
-						graphics-queue
-						swapchain-obj))
+	     
+	     (camera-uniform-buffers
+	      (create-uniform-buffers physical-device
+				      device
+				      (uniform-buffer-data->list (extent->uniform-buffer-data extent))
+				      framebuffer-size))
+	     (lights-uniform-buffers
+	      (create-uniform-buffers physical-device
+				      device
+				      (lights-data->list default-light-data)
+				      framebuffer-size))
+	     
+	     (albedo-texture-data (create-texture-data physical-device
+						       device
+						       command-pool
+						       graphics-queue
+						       swapchain-obj
+						       "textures/tile/ugznfcyo_4K_Albedo.jpg"))
+	     (normal-texture-data (create-texture-data physical-device
+						       device
+						       command-pool
+						       graphics-queue
+						       swapchain-obj
+						       "textures/tile/ugznfcyo_4K_Normal.jpg"))
+	     (ao-texture-data (create-texture-data physical-device
+						   device
+						   command-pool
+						   graphics-queue
+						   swapchain-obj
+						   "textures/tile/ugznfcyo_4K_AO.jpg"))
+	     (metallic-texture-data (create-texture-data physical-device
+							 device
+							 command-pool
+							 graphics-queue
+							 swapchain-obj
+							 "textures/tile/ugznfcyo_4K_Gloss.jpg"))
+
+	     (roughness-texture-data (create-texture-data physical-device
+							  device
+							  command-pool
+							  graphics-queue
+							  swapchain-obj
+							  "textures/tile/ugznfcyo_4K_Roughness.jpg"))
+	     
 	     (descriptor-sets (create-descriptor-sets device
 						      (create-descriptor-pool device
 									      framebuffer-size)
 						      (pipeline-descriptor-set-layout pipeline)
-						      uniform-buffers
-						      texture-data)))
+						      (map cons
+							   camera-uniform-buffers
+							   lights-uniform-buffers)
+						      (list albedo-texture-data
+							    normal-texture-data
+							    ao-texture-data
+							    metallic-texture-data
+							    roughness-texture-data))))
 	(cons (create-command-buffers device
 				      swapchain-obj
 				      command-pool

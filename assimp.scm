@@ -1,4 +1,3 @@
-;;
 ;; ffi bindings for assimp
 ;;
 

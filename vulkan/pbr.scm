@@ -113,18 +113,19 @@
 (define clear-values-ptr (list->vk-clear-value-pointer-array
 			  (list (make-vk-clear-value clear-values))))
 
-(execute-command-buffer device
-			cmd-pool
-			graphics-queue
-			#t
-			(lambda (command-buffer)
-			  (let ((render-area
-				 (make-render-area '(0 . 0)
-						   (cons +dimension+ +dimension+))))
-			    (perform-render-pass (make-render-pass-data command-buffer
-									framebuffer
-									render-area
-									clear-values-ptr
-									brdf-pipeline)
-						 (lambda ()
-						   (vk-cmd-draw command-buffer 3 1 0 0))))))
+(define execute-brdf-pass
+  (lambda (device cmd-pool graphics-queue brdf-pipeline)
+    
+    (define render-pass
+      (lambda (command-buffer)
+	(let ((render-area (make-render-area '(0 . 0) (cons +dimension+ +dimension+))))
+	  (perform-render-pass (make-render-pass-data command-buffer
+						      framebuffer
+						      render-area
+						      clear-values-ptr
+						      brdf-pipeline)
+			       (lambda () (vk-cmd-draw command-buffer 3 1 0 0))))))
+    
+    (execute-command-buffer device cmd-pool graphics-queue #t render-pass)))
+
+(execute-brdf-pass device cmd-pool graphics-queue brdf-pipeline)

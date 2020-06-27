@@ -1,5 +1,6 @@
 
 
+
 (trace-define-syntax define-vulkan-struct
   (syntax-rules ()
     ((_ struct-name ((member-name . member-type) ...))

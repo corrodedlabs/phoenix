@@ -19,7 +19,6 @@ layout(location = 2) out vec2 outTexCoord;
 
 
 void main() {
-    
     outWorldPos = vec3(ubo.model * vec4(inPosition, 1.0));
     outNormal = mat3(ubo.model) * inNormal;
     outTexCoord = inTexCoord;

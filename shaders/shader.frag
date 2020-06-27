@@ -18,14 +18,14 @@ layout (binding = 1) uniform UBOParams {
     float gamma;
 } uboParams;
 
-layout (binding = 2) uniform samplerCube samplerIrradiance;
-layout (binding = 3) uniform sampler2D samplerBRDFLUT;
-layout (binding = 4) uniform samplerCube prefilteredMap;
-layout (binding = 5) uniform sampler2D albedoMap;
-layout (binding = 6) uniform sampler2D normalMap;
-layout (binding = 7) uniform sampler2D aoMap;
-layout (binding = 8) uniform sampler2D metallicMap;
-layout (binding = 9) uniform sampler2D roughnessMap;
+// layout (binding = 2) uniform samplerCube samplerIrradiance;
+layout (binding = 2) uniform sampler2D samplerBRDFLUT;
+// layout (binding = 4) uniform samplerCube prefilteredMap;
+layout (binding = 3) uniform sampler2D albedoMap;
+layout (binding = 4) uniform sampler2D normalMap;
+layout (binding = 5) uniform sampler2D aoMap;
+layout (binding = 6) uniform sampler2D metallicMap;
+layout (binding = 7) uniform sampler2D roughnessMap;
 
 layout(location = 0) out vec4 outColor;
 
@@ -159,16 +159,19 @@ void main () {
     }
 
     vec2 brdf = texture(samplerBRDFLUT, vec2(max(dot(N, V), 0.0), roughness)).rg;
-    vec3 reflection = prefilteredReflection(R, roughness).rgb;
-    vec3 irradiance = texture(samplerIrradiance, N).rgb;
+    // vec3 reflection = prefilteredReflection(R, roughness).rgb;
+    // vec3 irradiance = texture(samplerIrradiance, N).rgb;
 
     // Diffuse based on irradiance
-    vec3 diffuse = irradiance * ALBEDO;
+    // vec3 diffuse = irradiance * ALBEDO;
+    vec3 diffuse = ALBEDO;
 
     vec3 F = FresnelSchlickRoughness(max(dot(N, V), 0.0), F0, roughness);
 
     // Specular reflectance
-    vec3 specular = reflection * (F * brdf.x + brdf.y);
+    // vec3 specular = reflection * (F * brdf.x + brdf.y);
+
+    vec3 specular = (F * brdf.x + brdf.y);
 
     // Ambient part
     vec3 kD = 1.0 - F;

@@ -31,8 +31,8 @@
       (lambda ()
 	(fx* 4
 	     (length vertices)
-	     ;; (length normals)
-	     (length (or colors (list white-color)))
+	     (length normals)
+	     ;; (length (or colors (list white-color)))
 	     (length uvs))))
 
     (define vertex-input->list
@@ -42,17 +42,17 @@
 		   "uvs" (length uvs))
 	(apply append (map append
 			   vertices
-			   ;; normals
+			   normals
 			   ;; todo colors not being captured
-			   (or  (map (lambda (_) white-color) vertices))
+			   ;; (or  (map (lambda (_) white-color) vertices))
 			   uvs))))
 
     (define vertex-input-stride
       (lambda ()
 	(fx* 4
 	     (+ (length (car vertices))
-		;; (length (car normals))
-		(length (or (and colors (car colors)) white-color))
+		(length (car normals))
+		;; (length (or (and colors (car colors)) white-color))
 		(length (car uvs))))))
 
     (make-vertex-input-metadata (sizeof-vertex-input)
@@ -60,8 +60,8 @@
 				(vertex-input-stride)
 				indices-data
 				(vector->attr (list (car vertices)
-						    ;; (car normals)
-						    (or (and colors (car colors)) white-color)
+						    (car normals)
+						    ;; (or (and colors (car colors)) white-color)
 						    (car uvs)))
 				(reverse components)))))
 

@@ -47,6 +47,8 @@
 ;; default vertex input struct
 (define-record-type vertex-input (fields position color texture-coord))
 
+
+
 ;; currently supported shaders
 (define-record-type shaders (fields vertex fragment))
 (define-record-type vertex-input-details (fields vertex-input-list stride attrs))
@@ -56,7 +58,6 @@
 (define-record-type pipeline-data
   (fields shaders vertex-input-details render-pass descriptor-layout rasterization-state
 	  depth-stencil-state viewport))
-
 
 ;; takes input a nested list and returns a list of cons cell (format . offset)
 ;; these are usually saved in the field attrs of vertex-input-metadata
@@ -254,6 +255,9 @@
 						    '(0.0 0.0 0.0 0.0))))
 
 
+(define-record-type descriptor-layout-detail
+  (fields descriptor-type shader-stage immutable-sampler descriptor-count))
+
 ;; descriptor set layout
 
 (define create-descriptor-layout
@@ -267,24 +271,29 @@
       (vk-create-descriptor-set-layout device info 0 layout)
       layout)))
 
+(define descriptor-layout-details->descriptor-layout
+  (lambda (device details)
 
-(define configure-descriptor-layout
-  (lambda (device)
-    (let* ((uniform-buffer-binding
-	    (make-vk-descriptor-set-layout-binding 0
-						   vk-descriptor-type-uniform-buffer
-						   1
-						   vk-shader-stage-vertex-bit
-						   (null-pointer vk-sampler)))
-	   (texture-sampler-binding
-	    (make-vk-descriptor-set-layout-binding 1
-						   vk-descriptor-type-combined-image-sampler
-						   1
-						   vk-shader-stage-fragment-bit
-						   (null-pointer vk-sampler)))
-	   (bindings (list->vk-descriptor-set-layout-binding-pointer-array
-		      (list uniform-buffer-binding texture-sampler-binding))))
-      (create-descriptor-layout device bindings))))
+    (define details->bindings
+      (lambda ()
+	(list->vk-descriptor-set-layout-binding-pointer-array
+	 (map-indexed (lambda (detail index)
+			(match detail
+			  (($ descriptor-layout-detail
+			      descriptor-type
+			      shader-stage
+			      sampler
+			      descriptor-count)
+			   (let ((sampler (or sampler (null-pointer vk-sampler))))
+			     (make-vk-descriptor-set-layout-binding index
+								    descriptor-type
+								    descriptor-count
+								    shader-stage
+								    sampler)))))
+		      details))))
+    
+    (create-descriptor-layout device (details->bindings))))
+
 
 
 ;; pipeline layout
@@ -292,7 +301,7 @@
 ;; returns (pipeline-layout . descriptor-layout)
 (define (create-pipeline-layout device descriptor-layout)
   (let* ((descriptor-layout (or descriptor-layout
-			       (configure-descriptor-layout device)))
+			       (error "no descriptor layout" #f)))
 	 (layout-info
 	  (make-vk-pipeline-layout-create-info pipeline-layout-create-info 0 0
 					       1
