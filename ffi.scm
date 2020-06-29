@@ -35,9 +35,9 @@
 	  double-pointer->list)
 
   (import (chezscheme)
-	  (prelude))
+	  	  (prelude))
 
-  (define libc (load-shared-object "libc.so.6"))
+  (define libc (load-shared-library (make-library-detail #f "libc.so.6" "msvcrt.dll")))
 
   (define memcpy
     (foreign-procedure "memcpy" (uptr uptr size_t) void))
@@ -151,7 +151,11 @@
 			   strs)))))))))
 
   
-  (define strdup (foreign-procedure "strdup" (string) string))
+  (define strdup 
+	(let ((proc-name (cond 
+					 	((foreign-entry? "strdup") "strdup")
+						((foreign-entry? "_strdup") "_strdup"))))
+	  (foreign-procedure proc-name (string) string)))
 
   (define-syntax write-cstring
     (syntax-rules ()

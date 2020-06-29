@@ -10,10 +10,13 @@
 	  compile-shaders)
   
   (import (chezscheme)
+	  (prelude)
 	  (ffi)
 	  (only (srfi s13 strings) string-join))
 
-  (define s (load-shared-object "libshaderc_shared.so"))
+  (define s (load-shared-library (make-library-detail #f
+						      "libshaderc_shared.so"
+						      "phoenix-libs/libshaderc_shared.dll")))
 
   ;;;;;;;;;;;;;;;;;;;;;;;
   ;; low level wrapper ;;

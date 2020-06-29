@@ -21,7 +21,9 @@
 	  (vulkan structure-types))
 
   (define g (load-glfw))
-  (define v (load-shared-object "libvulkan.so.1"))
+  (define v (load-shared-library (make-library-detail #f 
+						      "libvulkan.so.1"
+						      "vulkan-1.dll")))
 
   (include "vulkan/enums.scm")
   (include "vulkan/ftype.scm")
