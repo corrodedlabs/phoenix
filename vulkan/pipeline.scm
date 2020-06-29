@@ -332,8 +332,8 @@
 				    vk-image-layout-undefined
 				    final-layout)))
 
-(define optimal-color-attachment-reference
-  (lambda () (make-vk-attachment-reference 0 vk-image-layout-color-attachment-optimal)))
+(define create-color-attachment-reference
+  (lambda (final-layout) (make-vk-attachment-reference 0 final-layout)))
 
 (define create-subpass-description
   (case-lambda
@@ -377,10 +377,11 @@
 	       
 	       (color-attachment
 		(create-color-attachment-description swapchain-image-format
-						     vk-image-layout-color-attachment-optimal))
+						     vk-image-layout-present-src-khr))
 	       
-	       (color-attachment-ref (optimal-color-attachment-reference))
-
+	       (color-attachment-ref (create-color-attachment-reference
+				      vk-image-layout-color-attachment-optimal))
+	       
 	       (depth-attachment
 		(make-vk-attachment-description 0
 						(find-depth-format physical-device)

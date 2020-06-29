@@ -20,7 +20,7 @@
 
 ;; returns a list of framebuffers created for each of the swapchain image views
 (define create-framebuffers-for-swapchain
-  (lambda (physical-device device command-pool graphics-queue swapchain pipeline)
+  (lambda (physical-device device command-pool graphics-queue swapchain pipeline render-pass)
     (let ((depth-image-view (create-depth-buffer-image physical-device
 						       device
 						       command-pool
@@ -28,7 +28,11 @@
 						       swapchain))
 	  (extent (swapchain-extent swapchain)))
       (map (lambda (image-view)
-	     (create-framebuffer device extent image-view (gpu-image-view depth-image-view)))
+	     (create-framebuffer device
+				 render-pass
+				 extent
+				 image-view
+				 (gpu-image-view depth-image-view)))
 	   (swapchain-image-views swapchain)))))
 
 
@@ -73,13 +77,13 @@
       command-buffer))))
 
 ;; timeout in nanosecs
-(define +timeout+ #xFFFFFFFFFFFFFFFF)
+
 
 (define end-command-buffer-recording
   (case-lambda
    ((command-buffer)
     (vk-end-command-buffer command-buffer))
-   ((command-buffer graphics-queue wait?)
+   ((command-buffer device graphics-queue wait?)
     (vk-end-command-buffer command-buffer)
     (let ((submit-info (make-vk-submit-info submit-info 0
 					    0
@@ -109,7 +113,10 @@
 ;; once f returns the command buffer is submitted to the queue and
 ;; we wait for device idle
 (define execute-command-buffer
-  (lambda (device command-pool graphics-queue wait? f)
+  (case-lambda
+   ((device command-pool graphics-queue f)
+    (execute-command-buffer device command-pool graphics-queue #f f))
+   ((device command-pool graphics-queue wait? f)
     (let ((command-buffer #f))
       (dynamic-wind
 	  (lambda ()
@@ -119,11 +126,11 @@
 						  #t)))
 	  (lambda ()
 	    (f command-buffer)
-	    (end-command-buffer-recording command-buffer graphics-queue wait?))
+	    (end-command-buffer-recording command-buffer device graphics-queue wait?))
 	  (lambda ()
 	    ;; (vk-free-command-buffers device command-pool 1 command-buffer)
 	    #f
-	    )))))
+	    ))))))
 
 ;; allocate 'num-buffers' command-buffers and record the command as passed in f
 ;; to all of them
@@ -374,10 +381,13 @@
 		      data)))
 
        ((number? (car data))
-	(list->u32-pointer-array
+	;; todo shouldn;t do this
+	(list->float-pointer-array
 	 (map-indexed (lambda (value i)
-			(let ((ptr (make-foreign-object u32)))
-			  (ftype-set! u32 () ptr value)
+			(let ((ptr (make-foreign-object float)))
+			  (ftype-set! float () ptr (if (exact? value)
+						       (exact->inexact value)
+						       value))
 			  ptr)) 
 		      data))))))))
 
@@ -446,9 +456,10 @@
 
 (define update-uniform-buffer
   (lambda (device uniform-buffer matrix eye-position movement-direction)
-    ;; (displayln "uniform buffer" uniform-buffer "matrix" matrix "eye position" eye-position)
+    (displayln "uniform buffer" uniform-buffer "matrix" matrix "eye position" eye-position)
     (match uniform-buffer
       (($ buffer handle memory size)
+       (displayln "updating matrix")
        (match (update-mvp-matrix matrix eye-position movement-direction)
 	 ((matrix . eye)
 	  (copy-data-from-scheme device
@@ -509,10 +520,10 @@
 
     (let* ((num-sets (length uniform-buffers))
 	   ;; todo can be optimized further
-	   (camera-ubo-size (sizeof-scheme-data (caar uniform-buffers)))
-	   (light-ubo-size (sizeof-scheme-data (cadar uniform-buffers)))
+	   (camera-ubo-size (buffer-size (caar uniform-buffers)))
+	   (light-ubo-size (buffer-size (cdar uniform-buffers)))
 	   (descriptor-sets  (allocate-descriptor-sets num-sets)))
-      (displayln "ubo size is" ubo-size)
+      (displayln "ubox isze " camera-ubo-size light-ubo-size)
       (map (lambda (camera-uniform-buffer lights-uniform-buffer descriptor-set)
 	     (let* ((camera-buffer-info
 		     (make-vk-descriptor-buffer-info (pointer-ref-value camera-uniform-buffer)
@@ -529,7 +540,7 @@
 							   (pointer-ref-value
 							    (texture-data-image-view texture-data))
 							   vk-image-layout-shader-read-only-optimal))
-			  (cons pbr-texture-data textures-data)))
+			  textures-data))
 		    
 		    (uniform-buffer-writes
 		     (map-indexed (lambda (buffer-info index)
@@ -562,7 +573,7 @@
 		      image-infos))
 		    
 		    (write (list->vk-write-descriptor-set-pointer-array
-			    (append uniform-buffer-writes combined-image-sampler-write))))
+			    (append uniform-buffer-writes combined-image-sampler-writes))))
 	       
 	       (vk-update-descriptor-sets device
 					  (array-pointer-length write)

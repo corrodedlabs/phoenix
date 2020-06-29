@@ -32,7 +32,8 @@
   (define vector->list
     (lambda (vector)
       (match vector
-	(($ vector4 x y z w) (list x y z w)))))
+	(($ vector4 x y z w) (list x y z w))
+	(($ vector3 x y z)   (list x y z)))))
 
   (define matrix->list
     (lambda (matrix)
@@ -294,7 +295,8 @@
     (lambda (mvp-matrix-obj)
       (match mvp-matrix-obj
 	(($ mvp-matrix model view projection eye)
-	 (apply append (map matrix->list (list model view projection eye)))))))
+	 (append (apply append (map matrix->list (list model view projection)))
+		 (vector->list eye))))))
 
   (define up (make-vector3 0.0 1.0 0.0))
 

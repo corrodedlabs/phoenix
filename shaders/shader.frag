@@ -75,18 +75,18 @@ vec3 FresnelSchlickRoughness(float cos_theta, vec3 F0, float roughness) {
 
 // ibl
 
-vec3 prefilteredReflection(vec3 R, float roughness) {
-    const float MAX_REFLECTION_LOD = 9.0;
+// vec3 prefilteredReflection(vec3 R, float roughness) {
+//     const float MAX_REFLECTION_LOD = 9.0;
     
-    float lod = roughness * MAX_REFLECTION_LOD;
-    float lodFloor = floor(lod);
-    float lodCeil = ceil(lod);
+//     float lod = roughness * MAX_REFLECTION_LOD;
+//     float lodFloor = floor(lod);
+//     float lodCeil = ceil(lod);
 
-    vec3 a = textureLod(prefilteredMap, R, lodFloor).rgb;
-    vec3 b = textureLod(prefilteredMap, R, lodCeil).rgb;
+//     vec3 a = textureLod(prefilteredMap, R, lodFloor).rgb;
+//     vec3 b = textureLod(prefilteredMap, R, lodCeil).rgb;
 
-    return mix(a, b, lodFloor - lodCeil);
-}
+//     return mix(a, b, lodFloor - lodCeil);
+// }
 
 // Lighting calculations
 

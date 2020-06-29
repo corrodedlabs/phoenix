@@ -257,7 +257,7 @@
 			    vk-format-feature-depth-stencil-attachment-bit)))
 
 (define allocate-memory-for-image
-  (lambda (phyical-device device image-handle)
+  (lambda (physical-device device image-handle)
     (let ((memory (allocate-image-memory physical-device device image-handle)))
       (bind-image-memory device image-handle memory)
       memory)))

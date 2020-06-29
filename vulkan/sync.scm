@@ -15,6 +15,7 @@
 
 (define init-sync-objects
   (lambda (device)
+    (displayln "init sync" device)
     (map (lambda (i)
 	   (let ((semaphore-info (make-vk-semaphore-create-info semaphore-create-info 0 0))
 		 (fence-info (make-vk-fence-create-info fence-create-info
@@ -44,7 +45,7 @@
 (define *run-draw-loop* #f)
 
 (define draw-next-frame
-  (lambda (window device swapchain queues uniform-buffers cmd-buffers sync-objects state)
+  (lambda (window device swapchain queues uniform-buffers cmd-buffers sync-objects state camera-matrix)
     (display "starting draw loop") (newline)
     (let ((image-index (make-foreign-object u32))
 	  (uniform-buffers (list->vector uniform-buffers))
@@ -53,7 +54,7 @@
 	  (graphics-queue (car queues))
 	  (present-queue (cdr queues)))
       (let lp ((state state)
-	       (eye-position (cons (cdr (vector-ref uniform-buffers 0))
+	       (eye-position (cons camera-matrix
 				   (make-vector3 10.0 13.0 1.8)))
 	       (i 0))
 	(match state

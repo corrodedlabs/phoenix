@@ -19,7 +19,7 @@
 (define configure-descriptor-layout
   (lambda (device)
 
-    (define fragement-sampler-binding
+    (define fragment-sampler-binding
       (lambda (binding-index)
 	(make-vk-descriptor-set-layout-binding binding-index
 					       vk-descriptor-type-combined-image-sampler
@@ -27,7 +27,7 @@
 					       vk-shader-stage-fragment-bit
 					       (null-pointer vk-sampler))))
 
-    (define uniform-buffer-binding
+    (define make-uniform-buffer-binding
       (lambda (binding-index stage)
 	(make-vk-descriptor-set-layout-binding binding-index
 					       vk-descriptor-type-uniform-buffer
@@ -35,17 +35,21 @@
 					       stage
 					       (null-pointer vk-sampler))))
     
-    (let* ((uniform-buffer-binding (uniform-buffer-binding 0 (bitwise-ior vk-shader-stage-vertex-bit
-									  vk-shader-stage-fragment-bit)))
-	   (light-info-binding (uniform-buffer-binding 1 vk-shader-stage-fragment-bit))
+    (let* ((uniform-buffer-binding
+	    (make-uniform-buffer-binding 0
+					 (bitwise-ior vk-shader-stage-vertex-bit
+						      vk-shader-stage-fragment-bit)))
+	   (light-info-binding (make-uniform-buffer-binding 1 vk-shader-stage-fragment-bit))
 	   (texture-sampler-bindings (map fragment-sampler-binding (cddr (iota 10))))
 	   (bindings (list->vk-descriptor-set-layout-binding-pointer-array
-		      (append (list uniform-buffer-binding light-info-binding) bindings))))
+		      (append (list uniform-buffer-binding light-info-binding)
+			      texture-sampler-bindings))))
       (create-descriptor-layout device bindings))))
 
 ;; returns a cons cell of (vertex-input-metadata . graphics-pipeline)
 (define create-pipeline
   (lambda (state shaders model-filename)
+    (displayln "creating pipeline")
     (match-let (((@ vulkan-state (physical-device physical-device)
 				 (device device)
 				 (swapchain swapchain)) state))
@@ -62,10 +66,10 @@
 						descriptor-layout
 						rasterization-state
 						depth-state
-						#t
 						(swapchain-extent swapchain))))
-	(cons (create-graphics-pipeline physical-device device pipeline-data)
-	      vertex-input-metadata)))))
+	(list (create-graphics-pipeline physical-device device pipeline-data)
+	      vertex-input-metadata
+	      render-pass)))))
 
 ;; descriptor data
 
@@ -73,7 +77,8 @@
 
 ;; returns a list of ( command-pool command-buffers uniform-buffers)
 (define create-buffers
-  (lambda (state vertex-input-metadata-obj pipeline)
+  (lambda (state pipeline vertex-input-metadata-obj render-pass)
+    (displayln "creating buffer")
     (match-let* (((@ vulkan-state (physical-device physical-device)
 				  (device device)
 				  (swapchain swapchain-obj)
@@ -105,13 +110,16 @@
 							      command-pool
 							      graphics-queue
 							      swapchain-obj
-							      pipeline))
+							      pipeline
+							      render-pass))
 	     (framebuffer-size (length framebuffers))
+
+	     (camera-matrix (extent->uniform-buffer-data extent))
 	     
 	     (camera-uniform-buffers
 	      (create-uniform-buffers physical-device
 				      device
-				      (uniform-buffer-data->list (extent->uniform-buffer-data extent))
+				      (uniform-buffer-data->list camera-matrix)
 				      framebuffer-size))
 	     (lights-uniform-buffers
 	      (create-uniform-buffers physical-device
@@ -150,6 +158,8 @@
 							  graphics-queue
 							  swapchain-obj
 							  "textures/tile/ugznfcyo_4K_Roughness.jpg"))
+
+	     (pbr-texture-data (brdf-data physical-device device command-pool graphics-queue))
 	     
 	     (descriptor-sets (create-descriptor-sets device
 						      (create-descriptor-pool device
@@ -158,12 +168,13 @@
 						      (map cons
 							   camera-uniform-buffers
 							   lights-uniform-buffers)
-						      (list albedo-texture-data
+						      (list pbr-texture-data
+							    albedo-texture-data
 							    normal-texture-data
 							    ao-texture-data
 							    metallic-texture-data
 							    roughness-texture-data))))
-	(cons (create-command-buffers device
+	(list (create-command-buffers device
 				      swapchain-obj
 				      command-pool
 				      pipeline
@@ -173,7 +184,8 @@
 				      descriptor-sets
 				      (length indices)
 				      components)
-	      uniform-buffers)))))
+	      camera-uniform-buffers
+	      camera-matrix)))))
 
 (define sync-objects (lambda (device) (init-sync-objects device)))
 
@@ -185,7 +197,7 @@
 
 
 (define run-draw-loop
-  (lambda (state uniform-buffers command-buffers)
+  (lambda (state uniform-buffers command-buffers camera-matrix)
     (match state
       ((@ vulkan-state (window window)
 		       (device device)
@@ -198,7 +210,8 @@
 			uniform-buffers
 			command-buffers
 			(sync-objects device)
-			(initial-state command-buffers))))))
+			(initial-state command-buffers)
+			camera-matrix)))))
 
 
 

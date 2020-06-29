@@ -40,4 +40,5 @@
   (include "vulkan/buffers.scm")
 
   (include "vulkan/sync.scm")
+  (include "vulkan/pbr.scm")
   (include "vulkan.scm"))
