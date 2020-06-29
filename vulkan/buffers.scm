@@ -1,31 +1,38 @@
 
 ;; Framebuffers
 
-;; returns a list of framebuffers created for each of the swapchain image views
-(define create-framebuffers
-  (lambda (physical-device device command-pool graphics-queue swapchain pipeline)
+(define (framebuffer-info render-pass extent . image-views)
+  (displayln "image views" image-views)
+  (let ((views (list->vk-image-view-pointer-array image-views)))
+    (make-vk-frame-buffer-create-info framebuffer-create-info 0 0
+				      (pointer-ref-value render-pass)
+				      (array-pointer-length views)
+				      (array-pointer-raw-ptr views)
+				      (vk-extent-2d-width extent)
+				      (vk-extent-2d-height extent)
+				      1)))
 
-    (define (framebuffer-info . image-views)
-      (let ((views (list->vk-image-view-pointer-array image-views)))
-	(displayln "views" views)
-	(make-vk-frame-buffer-create-info framebuffer-create-info 0 0
-					  (pointer-ref-value (pipeline-render-pass pipeline))
-					  (array-pointer-length views)
-					  (array-pointer-raw-ptr views)
-					  (vk-extent-2d-width (swapchain-extent swapchain))
-					  (vk-extent-2d-height (swapchain-extent swapchain))
-					  1)))
-    
+(define (create-framebuffer device render-pass extent . image-views)
+  (let ((info (apply framebuffer-info (append (list render-pass extent) image-views)))
+	(framebuffer (make-foreign-object vk-frame-buffer)))
+    (vk-create-framebuffer device info 0 framebuffer)
+    framebuffer))
+
+;; returns a list of framebuffers created for each of the swapchain image views
+(define create-framebuffers-for-swapchain
+  (lambda (physical-device device command-pool graphics-queue swapchain pipeline render-pass)
     (let ((depth-image-view (create-depth-buffer-image physical-device
 						       device
 						       command-pool
 						       graphics-queue
-						       swapchain)))
+						       swapchain))
+	  (extent (swapchain-extent swapchain)))
       (map (lambda (image-view)
-	     (let ((info (framebuffer-info image-view (gpu-image-view depth-image-view)))
-		   (framebuffer (make-foreign-object vk-frame-buffer)))
-	       (vk-create-framebuffer device info 0 framebuffer)
-	       framebuffer))
+	     (create-framebuffer device
+				 render-pass
+				 extent
+				 image-view
+				 (gpu-image-view depth-image-view)))
 	   (swapchain-image-views swapchain)))))
 
 
@@ -57,23 +64,26 @@
 
 (define start-command-buffer-recording
   (case-lambda
-    ((command-buffer) (start-command-buffer-recording command-buffer #f))
-    ((command-buffer one-time-submit?)
-     (let ((begin-info (make-vk-command-buffer-begin-info
-			command-buffer-begin-info
-			0
-			(if one-time-submit?
-			    vk-command-buffer-usage-one-time-submit-bit
-			    0)
-			(null-pointer vk-command-buffer-inheritance-info))))
-       (vk-begin-command-buffer command-buffer begin-info)
-       command-buffer))))
+   ((command-buffer) (start-command-buffer-recording command-buffer #f))
+   ((command-buffer one-time-submit?)
+    (let ((begin-info (make-vk-command-buffer-begin-info
+		       command-buffer-begin-info
+		       0
+		       (if one-time-submit?
+			   vk-command-buffer-usage-one-time-submit-bit
+			   0)
+		       (null-pointer vk-command-buffer-inheritance-info))))
+      (vk-begin-command-buffer command-buffer begin-info)
+      command-buffer))))
+
+;; timeout in nanosecs
+
 
 (define end-command-buffer-recording
   (case-lambda
    ((command-buffer)
     (vk-end-command-buffer command-buffer))
-   ((command-buffer graphics-queue)
+   ((command-buffer device graphics-queue wait?)
     (vk-end-command-buffer command-buffer)
     (let ((submit-info (make-vk-submit-info submit-info 0
 					    0
@@ -82,8 +92,20 @@
 					    1
 					    command-buffer
 					    0
-					    (null-pointer vk-semaphore))))
-      (vk-queue-submit graphics-queue 1 submit-info 0)
+					    (null-pointer vk-semaphore)))
+	  (fence (and wait?
+		    (let ((fence (make-foreign-object vk-fence)))
+		      (vk-create-fence device
+				       (make-vk-fence-create-info fence-create-info 0 0)
+				       0
+				       fence)
+		      fence))))
+      (vk-queue-submit graphics-queue 1 submit-info (if wait?
+							(pointer-ref-value fence)
+							0))
+      (if wait?
+	  (begin (vk-wait-for-fences device 1 fence vk-true +timeout+)
+		 (vk-destroy-fence device fence 0)))
       (vk-queue-wait-idle graphics-queue)))))
 
 ;; creates and submits a single command buffer
@@ -91,20 +113,24 @@
 ;; once f returns the command buffer is submitted to the queue and
 ;; we wait for device idle
 (define execute-command-buffer
-  (lambda (device command-pool graphics-queue f)
+  (case-lambda
+   ((device command-pool graphics-queue f)
+    (execute-command-buffer device command-pool graphics-queue #f f))
+   ((device command-pool graphics-queue wait? f)
     (let ((command-buffer #f))
       (dynamic-wind
-	(lambda ()
-	  (set! command-buffer
-		(start-command-buffer-recording (allocate-command-buffers device command-pool)
-						#t)))
-	(lambda ()
-	  (begin (f command-buffer)
-		 (end-command-buffer-recording command-buffer graphics-queue)))
-	(lambda ()
-	  ;; (vk-free-command-buffers device command-pool 1 command-buffer)
-	  #f
-	  )))))
+	  (lambda ()
+	    (set! command-buffer
+		  (start-command-buffer-recording (allocate-command-buffers device
+									    command-pool)
+						  #t)))
+	  (lambda ()
+	    (f command-buffer)
+	    (end-command-buffer-recording command-buffer device graphics-queue wait?))
+	  (lambda ()
+	    ;; (vk-free-command-buffers device command-pool 1 command-buffer)
+	    #f
+	    ))))))
 
 ;; allocate 'num-buffers' command-buffers and record the command as passed in f
 ;; to all of them
@@ -125,6 +151,26 @@
 	   descriptor-sets)
       cmd-buffers-ptr)))
 
+(define-record-type render-pass-data
+  (fields command-buffer framebuffer render-area clear-values pipeline))
+
+(define perform-render-pass
+  (lambda (render-pass-info draw-lambda)
+    (match render-pass-info
+      (($ render-pass-data cmd-buffer framebuffer render-area clear-values pipeline)
+       (let ((info (make-vk-render-pass-begin-info (pipeline-render-pass pipeline)
+						   framebuffer
+						   render-area
+						   clear-values)))
+	 (vk-cmd-begin-render-pass cmd-buffer
+				   info
+				   vk-subpass-contents-inline)
+	 (vk-cmd-bind-pipeline cmd-buffer
+			       vk-pipeline-bind-point-graphics
+			       (pipeline-handle pipeline))
+	 (draw-lambda)
+	 (vk-cmd-end-render-pass cmd-buffer))))))
+
 
 (define create-command-buffers
   (lambda (device swapchain command-pool pipeline vertex-buffer index-buffer framebuffers
@@ -139,14 +185,10 @@
 	  (list->vk-clear-value-pointer-array (list (make-vk-clear-value clear-values)
 						    (make-vk-clear-value depth-clear))))))
 
-    (define perform-render-pass
+    (define render-pass
       (lambda (cmd-buffer framebuffer descriptor-set vertex-buffer index-buffer render-area
 		     clear-values)
-	(let ((info (make-vk-render-pass-begin-info (pipeline-render-pass pipeline)
-						    framebuffer
-						    render-area
-						    clear-values))
-	      (vertex-buffers (array-pointer-raw-ptr (list->vk-buffer-pointer-array
+	(let ((vertex-buffers (array-pointer-raw-ptr (list->vk-buffer-pointer-array
 						      (list (buffer-handle vertex-buffer)))))
 	      (offsets (array-pointer-raw-ptr
 			(list->u64-pointer-array (map (lambda (v)
@@ -154,38 +196,30 @@
 							  (ftype-set! u64 () ptr v)
 							  ptr))
 						      (list 0))))))
-	  (vk-cmd-begin-render-pass cmd-buffer
-				    info
-				    vk-subpass-contents-inline)
-	  (vk-cmd-bind-pipeline cmd-buffer
-				vk-pipeline-bind-point-graphics
-				(pipeline-handle pipeline))
-	  (vk-cmd-bind-vertex-buffers cmd-buffer
-	  			      0
-	  			      1
-				      vertex-buffers
-	  			      offsets)
-	  (vk-cmd-bind-index-buffer cmd-buffer
-	  			    (buffer-handle index-buffer)
-	  			    0
-	  			    vk-index-type-uint32)
-	  (vk-cmd-bind-descriptor-sets cmd-buffer
-	  			       vk-pipeline-bind-point-graphics
-	  			       (pipeline-layout pipeline)
-	  			       0
-	  			       1
-	  			       descriptor-set
-	  			       0
-	  			       (null-pointer u32))
-	  (for-each (lambda (component)
-	  	      (vk-cmd-draw-indexed cmd-buffer
-	  				   (mesh-component-index-count component)
-	  				   1
-	  				   0
-	  				   (mesh-component-index-base component)
-	  				   0))
-	  	    components)
-	  (vk-cmd-end-render-pass cmd-buffer) 
+	  (perform-render-pass
+	   (make-render-pass-data cmd-buffer framebuffer render-area clear-values pipeline)
+	   (lambda ()
+	     (vk-cmd-bind-vertex-buffers cmd-buffer 0 1 vertex-buffers offsets)
+	     (vk-cmd-bind-index-buffer cmd-buffer
+				       (buffer-handle index-buffer)
+				       0
+				       vk-index-type-uint32)
+	     (vk-cmd-bind-descriptor-sets cmd-buffer
+					  vk-pipeline-bind-point-graphics
+					  (pipeline-layout pipeline)
+					  0
+					  1
+					  descriptor-set
+					  0
+					  (null-pointer u32))
+	     (for-each (lambda (component)
+			 (vk-cmd-draw-indexed cmd-buffer
+					      (mesh-component-index-count component)
+					      1
+					      0
+					      (mesh-component-index-base component)
+					      0))
+		       components)))
 	  cmd-buffer)))
 
     (let ((clear-values (clear-values-ptr))
@@ -198,13 +232,13 @@
 			      framebuffers
 			      descriptor-sets
 			      (lambda (cmd-buffer framebuffer descriptor-set)
-				(perform-render-pass cmd-buffer
-						     framebuffer
-						     descriptor-set
-						     vertex-buffer
-						     index-buffer
-						     render-area
-						     clear-values))))))
+				(render-pass cmd-buffer
+					     framebuffer
+					     descriptor-set
+					     vertex-buffer
+					     index-buffer
+					     render-area
+					     clear-values))))))
 
 ;; Buffers
 
@@ -286,6 +320,7 @@
       (execute-command-buffer device
 			      command-pool
 			      graphics-queue
+			      #f
 			      (lambda (command-buffer)
 				(displayln "command-buffer is" command-buffer)
 				(vk-cmd-copy-buffer command-buffer
@@ -346,10 +381,13 @@
 		      data)))
 
        ((number? (car data))
-	(list->u32-pointer-array
+	;; todo shouldn;t do this
+	(list->float-pointer-array
 	 (map-indexed (lambda (value i)
-			(let ((ptr (make-foreign-object u32)))
-			  (ftype-set! u32 () ptr value)
+			(let ((ptr (make-foreign-object float)))
+			  (ftype-set! float () ptr (if (exact? value)
+						       (exact->inexact value)
+						       value))
 			  ptr)) 
 		      data))))))))
 
@@ -394,6 +432,10 @@
       (make-buffer gpu-buffer-ptr memory size))))
 
 
+;; descriptor state data
+;; buffer data for writing descriptor sets
+(define-record-type descriptor-set-data (fields uniform-buffers textures))
+
 ;; Uniform buffers
 
 (define-record-type uniform-buffer-data (fields model view projection))
@@ -406,22 +448,18 @@
     (calculate-mvp-matrix width height)))
 
 
-
 (define create-uniform-buffers
   (lambda (physical-device device data num-buffers)
     (map (lambda (i)
-	   (cons (create-host-buffer physical-device
-				     device
-				     (uniform-buffer-data->list data)
-				     vk-buffer-usage-uniform-buffer-bit)
-		 data))
+	   (create-host-buffer physical-device device data vk-buffer-usage-uniform-buffer-bit))
 	 (iota num-buffers))))
 
 (define update-uniform-buffer
   (lambda (device uniform-buffer matrix eye-position movement-direction)
-    ;; (displayln "uniform buffer" uniform-buffer "matrix" matrix "eye position" eye-position)
-    (match  (car uniform-buffer)
+    (displayln "uniform buffer" uniform-buffer "matrix" matrix "eye position" eye-position)
+    (match uniform-buffer
       (($ buffer handle memory size)
+       (displayln "updating matrix")
        (match (update-mvp-matrix matrix eye-position movement-direction)
 	 ((matrix . eye)
 	  (copy-data-from-scheme device
@@ -430,6 +468,16 @@
 	  (cons matrix eye))))
       (else (error "unifor buffer not valid" uniform-buffer)))))
 
+
+(define-record-type lights-data (fields positions exposure gamma))
+
+(define (lights-data->list data)
+  (match data
+    (($ lights-data positions exposure gamma)
+     (append positions (list exposure gamma)))))
+
+(define default-light-data (make-lights-data '(0 0 0 0 0 0 0 0) 4.5 2.5))
+
 ;; Descriptor sets and pools
 
 ;; used to pass on data like uniform buffers and textures to the shaders
@@ -437,10 +485,10 @@
 (define create-descriptor-pool
   (lambda (device descriptor-count)
     (let* ((uniform-buffer-pool-size (make-vk-descriptor-pool-size vk-descriptor-type-uniform-buffer
-								   descriptor-count))
+								   (* descriptor-count 2)))
 	   (image-sampler-pool-size
 	    (make-vk-descriptor-pool-size vk-descriptor-type-combined-image-sampler
-					  descriptor-count))
+					  (* descriptor-count 8)))
 	   (pool-size-ptr (list->vk-descriptor-pool-size-pointer-array
 			   (list uniform-buffer-pool-size image-sampler-pool-size)))
 	   (info (make-vk-descriptor-pool-create-info descriptor-pool-create-info 0 0
@@ -453,7 +501,7 @@
 
 
 (define create-descriptor-sets
-  (lambda (device descriptor-pool descriptor-layout uniform-buffers texture-data)
+  (lambda (device descriptor-pool descriptor-layout uniform-buffers textures-data)
     
     (define allocate-descriptor-sets
       (lambda (num-sets)
@@ -472,44 +520,61 @@
 
     (let* ((num-sets (length uniform-buffers))
 	   ;; todo can be optimized further
-	   (ubo-size (sizeof-scheme-data (uniform-buffer-data->list (cdar uniform-buffers))))
+	   (camera-ubo-size (buffer-size (caar uniform-buffers)))
+	   (light-ubo-size (buffer-size (cdar uniform-buffers)))
 	   (descriptor-sets  (allocate-descriptor-sets num-sets)))
-      (displayln "ubo size is" ubo-size)
-      (map (lambda (uniform-buffer descriptor-set)
-	     (let* ((buffer-info
-		     (make-vk-descriptor-buffer-info (pointer-ref-value uniform-buffer)
+      (displayln "ubox isze " camera-ubo-size light-ubo-size)
+      (map (lambda (camera-uniform-buffer lights-uniform-buffer descriptor-set)
+	     (let* ((camera-buffer-info
+		     (make-vk-descriptor-buffer-info (pointer-ref-value camera-uniform-buffer)
 						     0
-						     ubo-size))
-		    (image-info
-		     (make-vk-descriptor-image-info
-		      (pointer-ref-value (texture-data-sampler texture-data))
-		      (pointer-ref-value (texture-data-image-view texture-data))
-		      vk-image-layout-shader-read-only-optimal))
-		    (uniform-buffer-write
-		     (make-vk-write-descriptor-set write-descriptor-set
-						   0
-						   (pointer-ref-value descriptor-set)
-						   0
-						   0
-						   1
-						   vk-descriptor-type-uniform-buffer
-						   (null-pointer vk-descriptor-image-info)
-						   buffer-info
-						   (null-pointer vk-buffer-view)))
-		    (combined-image-sampler-write
-		     (make-vk-write-descriptor-set write-descriptor-set
-						   0
-						   (pointer-ref-value descriptor-set)
-						   1
-						   0
-						   1
-						   vk-descriptor-type-combined-image-sampler
-						   image-info
-						   (null-pointer vk-descriptor-buffer-info)
-						   (null-pointer vk-buffer-view)))
-		    (write
-		     (list->vk-write-descriptor-set-pointer-array
-		      (list uniform-buffer-write combined-image-sampler-write))))
+						     camera-ubo-size))
+		    (lights-buffer-info
+		     (make-vk-descriptor-buffer-info (pointer-ref-value lights-uniform-buffer)
+						     0
+						     light-ubo-size))
+		    (image-infos
+		     (map (lambda (texture-data)
+			    (make-vk-descriptor-image-info (pointer-ref-value
+							    (texture-data-sampler texture-data))
+							   (pointer-ref-value
+							    (texture-data-image-view texture-data))
+							   vk-image-layout-shader-read-only-optimal))
+			  textures-data))
+		    
+		    (uniform-buffer-writes
+		     (map-indexed (lambda (buffer-info index)
+				    (make-vk-write-descriptor-set write-descriptor-set
+								  0
+								  (pointer-ref-value descriptor-set)
+								  index
+								  0
+								  1
+								  vk-descriptor-type-uniform-buffer
+								  (null-pointer vk-descriptor-image-info)
+								  camera-buffer-info
+								  (null-pointer vk-buffer-view)))
+				  (list camera-buffer-info lights-buffer-info)))
+		    
+		    (combined-image-sampler-writes
+		     (map-indexed
+		      (lambda (image-info index)
+			(make-vk-write-descriptor-set write-descriptor-set
+						      0
+						      (pointer-ref-value descriptor-set)
+						      ;; first two filled by uniform buffer writes
+						      (+ 2 index)
+						      0
+						      1
+						      vk-descriptor-type-combined-image-sampler
+						      image-info
+						      (null-pointer vk-descriptor-buffer-info)
+						      (null-pointer vk-buffer-view)))
+		      image-infos))
+		    
+		    (write (list->vk-write-descriptor-set-pointer-array
+			    (append uniform-buffer-writes combined-image-sampler-writes))))
+	       
 	       (vk-update-descriptor-sets device
 					  (array-pointer-length write)
 					  (array-pointer-raw-ptr write)
@@ -517,6 +582,7 @@
 					  0)
 	       descriptor-set))
 	   (map (lambda (buf) (buffer-handle (car buf)))  uniform-buffers)
+	   (map (lambda (buf) (buffer-handle (cdr buf))) uniform-buffers)
 	   (vk-descriptor-set-pointer-map (lambda (x) x) descriptor-sets)))))
 
 

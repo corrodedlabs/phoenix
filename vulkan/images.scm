@@ -78,14 +78,22 @@
 			   vk-image-usage-depth-stencil-attachment-bit
 			   vk-image-aspect-depth-bit)))
 
-(define create-texture-property
-  (lambda (texture-width texture-height)
+(define create-image-property-for-texture
+  (case-lambda
+   ((texture-width texture-height)
+    (create-image-property-for-texture texture-width texture-height vk-format-r8g8b8a8-unorm))
+   ((texture-width texture-height format)
+    (create-image-property-for-texture texture-width
+				       texture-height
+				       format
+				       vk-image-usage-transfer-dst-bit))
+   ((texture-width texture-height format usage)
     (make-image-properties texture-width
 			   texture-height
-			   vk-format-r8g8b8a8-unorm
-			   (bitwise-ior vk-image-usage-transfer-dst-bit
+			   format
+			   (bitwise-ior usage
 					vk-image-usage-sampled-bit)
-			   vk-image-aspect-color-bit)))
+			   vk-image-aspect-color-bit))))
 
 (define allocate-image-memory
   (lambda (physical-device device image-handle)
@@ -248,14 +256,19 @@
 			    vk-image-tiling-optimal
 			    vk-format-feature-depth-stencil-attachment-bit)))
 
+(define allocate-memory-for-image
+  (lambda (physical-device device image-handle)
+    (let ((memory (allocate-image-memory physical-device device image-handle)))
+      (bind-image-memory device image-handle memory)
+      memory)))
+
 (define create-depth-buffer-image
   (lambda (physical-device device command-pool graphics-queue swapchain)
 
     (define create-gpu-image
       (lambda (property)
 	(let* ((image-handle (create-image-handle device property))
-	       (memory (allocate-image-memory physical-device device image-handle)))
-	  (bind-image-memory device image-handle memory)
+	       (memory (allocate-memory-for-image physical-device device image-handle)))
 	  (transition-image-layout device
 				   command-pool
 				   graphics-queue
@@ -297,10 +310,9 @@
       (lambda (image-buffer image-data)
 	(let* ((width (image-data-width image-data))
 	       (height (image-data-height image-data))
-	       (property (create-texture-property width height))
+	       (property (create-image-property-for-texture width height))
 	       (image-handle (create-image-handle device property))
-	       (memory (allocate-image-memory physical-device device image-handle)))
-	  (bind-image-memory device image-handle memory)
+	       (memory (allocate-memory-for-image physical-device device image-handle)))
 	  (transition-image-layout device
 				   command-pool
 				   graphics-queue

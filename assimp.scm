@@ -1,4 +1,3 @@
-;;
 ;; ffi bindings for assimp
 ;;
 
@@ -106,10 +105,10 @@
 
 (define-ftype aabb
   (struct (min vector3)
-	  (max vector3)))
+    (max vector3)))
 
 ;; // -------------------------------------------------------------------------------
-;; /** 
+;; /**
 ;; * A node in the imported hierarchy.
 ;; *
 ;; * Each node has name, a parent node (except for the root node),
@@ -201,8 +200,9 @@
 
 
 ;; load library
-
-(define o (load-shared-object "libassimp.so.5.0.0"))
+(define o (load-shared-library (make-library-detail #f 
+                                                    "libassimp.so.5.0.0" 
+                                                    "phoenix-libs/assimp-vc142-mtd.dll")))
 
 ;; define native functions
 
@@ -223,29 +223,29 @@
 (define (mesh-ptr->vertex-buffer-data mesh-ptr)
   (let* ((num-vertices (mesh-num-vertices mesh-ptr))
 
-	 (vertices
-	  (map flip-vertices
-	       (vector3-array-ptr->list (make-array-pointer num-vertices
-							    (mesh-vertices mesh-ptr)
-							    'vector3))))
-	 (normals
-	  (vector3-array-ptr->list (make-array-pointer num-vertices
-						       (mesh-normals mesh-ptr)
-						       'vector3)))
+         (vertices
+          (map flip-vertices
+               (vector3-array-ptr->list (make-array-pointer num-vertices
+                                         (mesh-vertices mesh-ptr)
+                                         'vector3))))
+         (normals
+          (vector3-array-ptr->list (make-array-pointer num-vertices
+                                    (mesh-normals mesh-ptr)
+                                    'vector3)))
 
-	 ;; Texture coordinates may have multiple channels, we only use the first we find
-	 (texture-coords-channel
-	  (find (lambda (ptr)
-		  (not (ftype-pointer-null? ptr))) (mesh-texture-coords mesh-ptr)))
-	 
-	 (texture-coords
-	  (map (lambda (uv-coords)
-		 (cond
-		  ((list? uv-coords) (list (car uv-coords) (cadr uv-coords)))
-		  (else (error "uv channels are missing"  mesh-ptr))))
-	       (vector3-array-ptr->list (make-array-pointer num-vertices
-							    texture-coords-channel
-							    'vector3)))))
+   ;; Texture coordinates may have multiple channels, we only use the first we find
+         (texture-coords-channel
+          (find (lambda (ptr)
+                 (not (ftype-pointer-null? ptr))) (mesh-texture-coords mesh-ptr)))
+
+         (texture-coords
+          (map (lambda (uv-coords)
+                (cond
+                 ((list? uv-coords) (list (car uv-coords) (cadr uv-coords)))
+                 (else (error "uv channels are missing"  mesh-ptr))))
+               (vector3-array-ptr->list (make-array-pointer num-vertices
+                                         texture-coords-channel
+                                         'vector3)))))
     (displayln "vertices are number: " num-vertices)
     (make-vertex-buffer-data vertices normals texture-coords #f)))
 
@@ -253,17 +253,17 @@
 
 ;; data for index buffer
 (define mesh-ptr->indices
-  (lambda (mesh-ptr vertex-offset)     
+  (lambda (mesh-ptr vertex-offset)
     (displayln "num of faces is " (mesh-num-faces mesh-ptr))
     (concatenate (face-pointer-map
-		  (lambda (face-ptr)
-		    (unsigned-pointer-map (lambda (x) (+ vertex-offset (read-unsigned x)))
-					  (make-array-pointer (face-num-indices face-ptr)
-							      (face-indices face-ptr)
-							      'unsigned)))
-		  (make-array-pointer (mesh-num-faces mesh-ptr)
-				      (mesh-faces mesh-ptr)
-				      'face)))))
+                  (lambda (face-ptr)
+                    (unsigned-pointer-map (lambda (x) (+ vertex-offset (read-unsigned x)))
+                        (make-array-pointer (face-num-indices face-ptr)
+                                (face-indices face-ptr)
+                                'unsigned)))
+                  (make-array-pointer (mesh-num-faces mesh-ptr)
+                          (mesh-faces mesh-ptr)
+                          'face)))))
 
 
 ;; record to collect the data required from assimp
@@ -287,47 +287,47 @@
 
     (define mesh-ptr->model-data
       (lambda (mesh-ptr vertex-offset)
-	(let ((vertex-data (mesh-ptr->vertex-buffer-data mesh-ptr))
-	      (indices (mesh-ptr->indices mesh-ptr vertex-offset)))
-	  (make-model-data vertex-data indices))))
+       (let ((vertex-data (mesh-ptr->vertex-buffer-data mesh-ptr))
+             (indices (mesh-ptr->indices mesh-ptr vertex-offset)))
+         (make-model-data vertex-data indices))))
 
     (define mesh-indices->model-data
       (lambda (mesh-indices mesh-list vertex-offset)
-	(unsigned-pointer-map (lambda (mesh-index)
-				(mesh-ptr->model-data (list-ref mesh-list
-								(read-unsigned mesh-index))
-						      vertex-offset))
-			      mesh-indices)))
+       (unsigned-pointer-map (lambda (mesh-index)
+                              (mesh-ptr->model-data (list-ref mesh-list
+                                                     (read-unsigned mesh-index))
+                                        vertex-offset))
+                 mesh-indices)))
 
     (define process-node
       (lambda (node-ptr meshes-list collected-mesh-data)
-	(let* ((num-meshes (node-num-meshes node-ptr))
-	       (mesh-indices (make-array-pointer num-meshes (node-meshes node-ptr) 'unsigned))
-	       (num-children (node-num-children node-ptr))
-	       (child-nodes (double-pointer->list (node-children node-ptr)
-						  node
-						  num-children))
-	       (vertex-offset (fold-left (lambda (offset model-data)
-					   (+ offset
-					      (length (vertex-buffer-data-vertices
-						       (model-data-vertex-data model-data)))))
-					 0
-					 collected-mesh-data)))
-	  (let ((current-mesh-data (mesh-indices->model-data mesh-indices
-							     meshes-list
-							     vertex-offset)))
-	    (fold-left (lambda (data child-node-ptr)
-			 (process-node child-node-ptr meshes-list data))
-		       (append collected-mesh-data current-mesh-data)
-		       child-nodes)))))
-    
+       (let* ((num-meshes (node-num-meshes node-ptr))
+              (mesh-indices (make-array-pointer num-meshes (node-meshes node-ptr) 'unsigned))
+              (num-children (node-num-children node-ptr))
+              (child-nodes (double-pointer->list (node-children node-ptr)
+                            node
+                            num-children))
+              (vertex-offset (fold-left (lambda (offset model-data)
+                                         (+ offset
+                                            (length (vertex-buffer-data-vertices
+                                                     (model-data-vertex-data model-data)))))
+                              0
+                              collected-mesh-data)))
+         (let ((current-mesh-data (mesh-indices->model-data mesh-indices
+                                   meshes-list
+                                   vertex-offset)))
+           (fold-left (lambda (data child-node-ptr)
+                       (process-node child-node-ptr meshes-list data))
+                (append collected-mesh-data current-mesh-data)
+                child-nodes)))))
+
     (let* ((scene-ptr (import_file model
-				   (bitwise-ior pretransform-vertices
-						triangulate
-						gen-normals)))
-	   (meshes-list (double-pointer->list (scene-meshes scene-ptr)
-					      mesh
-					      (scene-num-meshes scene-ptr))))
+                       (bitwise-ior pretransform-vertices
+                        triangulate
+                        gen-normals)))
+           (meshes-list (double-pointer->list (scene-meshes scene-ptr)
+                         mesh
+                         (scene-num-meshes scene-ptr))))
       (displayln "scene meshes " (scene-num-meshes scene-ptr))
       (process-node (scene-root-node scene-ptr) meshes-list (list)))))
 
@@ -335,7 +335,7 @@
 
 ;; > (load "assimp.scm")
 ;; > (import (assimp))
-(define model-file "models/sampleroom.dae")
+(define model-file "models/cube.dae")
 (define model-data-obj (import-model model-file))
 ;; (define model-data-obj (import-model "models/cube.obj"))
 ;; (define model-data-obj (import-model "models/Sponza-master/sponza.obj"))

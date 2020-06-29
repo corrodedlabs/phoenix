@@ -10,13 +10,20 @@
 	  movement-data-forward
 	  movement-data-back
 	  movement-data-right
-	  movement-data-left)
+	  movement-data-left
+	  load-glfw)
 
   (import (chezscheme)
+	  (prelude)
 	  (ffi)
 	  (glfw glfw))
 
-  ;; (define glfw (load-shared-object "libglfw.so"))
+  (define load-glfw (lambda ()
+		      (display "loading glfw") (newline)
+		      (load-shared-library (make-library-detail #f
+								"libglfw.so"
+								"phoenix-libs/glfw3.dll"))))
+  (define lib (load-glfw))
 
   (define glfw-init (foreign-procedure "glfwInit" () boolean))
 

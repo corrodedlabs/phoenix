@@ -32,6 +32,9 @@
 				      (create-shader-module frag-spv))))))
 
 
+
+;; let's capture all the custom information that can be supplied in the pipeline in a record
+
 ;; vertex input
 
 ;; this will contain data about mesh component in a model
@@ -43,6 +46,18 @@
 
 ;; default vertex input struct
 (define-record-type vertex-input (fields position color texture-coord))
+
+
+
+;; currently supported shaders
+(define-record-type shaders (fields vertex fragment))
+(define-record-type vertex-input-details (fields vertex-input-list stride attrs))
+(define-record-type rasterization-state (fields polygon-mode cull-mode front-face))
+(define-record-type depth-stencil-state (fields depth-test? depth-write? depth-compare-op))
+
+(define-record-type pipeline-data
+  (fields shaders vertex-input-details render-pass descriptor-layout rasterization-state
+	  depth-stencil-state viewport))
 
 ;; takes input a nested list and returns a list of cons cell (format . offset)
 ;; these are usually saved in the field attrs of vertex-input-metadata
@@ -138,13 +153,17 @@
 								     (cdr attr)))
 		       attrs)))))
     
-    (make-vk-pipeline-vertex-input-state-create-info pipeline-vertex-input-state-create-info
-						     0
-						     0
-						     1
-						     (make-vertex-binding-description)
-						     (length attrs)
-						     (make-attribute-descriptions))))
+    (let ((binding-count (if (null? attrs) 0 1))
+	  (binding-description (if (null? attrs)
+				   (null-pointer vk-vertex-input-binding-description)
+				   (make-vertex-binding-description))))
+      (make-vk-pipeline-vertex-input-state-create-info pipeline-vertex-input-state-create-info
+						       0
+						       0
+						       binding-count
+						       binding-description
+						       (length attrs)
+						       (make-attribute-descriptions)))))
 
 
 ;; input assembly
@@ -158,41 +177,49 @@
 
 ;; viewport
 
-(define (create-viewport-info swapchain-extent)
+(define create-viewport-info
+  (case-lambda
+   (() (create-viewport-info (make-vk-extent-2d 0 0)))
+   ((swapchain-extent)
 
-  (define (create-viewport)
-    (make-vk-viewport 0.0
-		      0.0
-		      (exact->inexact (vk-extent-2d-width swapchain-extent))
-		      (exact->inexact (vk-extent-2d-height swapchain-extent))
-		      0.0
-		      1.0))
+    (define (create-viewport)
+      (let ((width (vk-extent-2d-width swapchain-extent))
+	    (height (vk-extent-2d-height swapchain-extent)))
+	(make-vk-viewport 0.0
+			  0.0
+			  (exact->inexact width)
+			  (exact->inexact height)
+			  0.0
+			  (if (and (equal? 0 width)
+				 (equal? 0 height)) 0.0 1.0))))
 
-  (define (create-scissor)
-    (make-vk-rect-2d (make-vk-offset-2d 0 0) swapchain-extent))
+    (define (create-scissor)
+      (make-vk-rect-2d (make-vk-offset-2d 0 0) swapchain-extent))
 
-  (make-vk-pipeline-viewport-state-create-info pipeline-viewport-state-create-info 0 0
-					       1
-					       (create-viewport)
-					       1
-					       (create-scissor)))
+    (make-vk-pipeline-viewport-state-create-info pipeline-viewport-state-create-info 0 0
+						 1
+						 (create-viewport)
+						 1
+						 (create-scissor)))))
 
 ;; rasterizer
 
-(define (create-rasterizer-info)
-  (make-vk-pipeline-rasterization-state-create-info pipeline-rasterization-state-create-info
-						    0
-						    0
-						    vk-false
-						    vk-false
-						    vk-polygon-mode-fill
-						    vk-cull-mode-back-bit
-						    vk-front-face-clockwise
-						    vk-false
-						    0.0
-						    0.0
-						    0.0
-						    1.0))
+(define (create-rasterizer-info rasterization-state)
+  (match rasterization-state
+    (($ rasterization-state polygon-mode cull-mode front-face)
+     (make-vk-pipeline-rasterization-state-create-info pipeline-rasterization-state-create-info
+						       0
+						       0
+						       vk-false
+						       vk-false
+						       polygon-mode
+						       cull-mode
+						       front-face
+						       vk-false
+						       0.0
+						       0.0
+						       0.0
+						       1.0))))
 
 ;; multisampling
 
@@ -228,39 +255,53 @@
 						    '(0.0 0.0 0.0 0.0))))
 
 
+(define-record-type descriptor-layout-detail
+  (fields descriptor-type shader-stage immutable-sampler descriptor-count))
+
 ;; descriptor set layout
 
 (define create-descriptor-layout
-  (lambda (device)
-    (let* ((uniform-buffer-binding
-	    (make-vk-descriptor-set-layout-binding 0
-						   vk-descriptor-type-uniform-buffer
-						   1
-						   vk-shader-stage-vertex-bit
-						   (null-pointer vk-sampler)))
-	   (texture-sampler-binding
-	    (make-vk-descriptor-set-layout-binding 1
-						   vk-descriptor-type-combined-image-sampler
-						   1
-						   vk-shader-stage-fragment-bit
-						   (null-pointer vk-sampler)))
-	   (bindings (list->vk-descriptor-set-layout-binding-pointer-array
-		      (list uniform-buffer-binding texture-sampler-binding)))
- 	   (info (make-vk-descriptor-set-layout-create-info descriptor-set-layout-create-info
-							    0
-							    0
-							    (array-pointer-length bindings)
-							    (array-pointer-raw-ptr bindings)))
-	   (layout (make-foreign-object vk-descriptor-set-layout)))
+  (lambda (device bindings)
+    (let ((info (make-vk-descriptor-set-layout-create-info descriptor-set-layout-create-info
+							   0
+							   0
+							   (array-pointer-length bindings)
+							   (array-pointer-raw-ptr bindings)))
+	  (layout (make-foreign-object vk-descriptor-set-layout)))
       (vk-create-descriptor-set-layout device info 0 layout)
       layout)))
+
+(define descriptor-layout-details->descriptor-layout
+  (lambda (device details)
+
+    (define details->bindings
+      (lambda ()
+	(list->vk-descriptor-set-layout-binding-pointer-array
+	 (map-indexed (lambda (detail index)
+			(match detail
+			  (($ descriptor-layout-detail
+			      descriptor-type
+			      shader-stage
+			      sampler
+			      descriptor-count)
+			   (let ((sampler (or sampler (null-pointer vk-sampler))))
+			     (make-vk-descriptor-set-layout-binding index
+								    descriptor-type
+								    descriptor-count
+								    shader-stage
+								    sampler)))))
+		      details))))
+    
+    (create-descriptor-layout device (details->bindings))))
+
 
 
 ;; pipeline layout
 
 ;; returns (pipeline-layout . descriptor-layout)
-(define (create-pipeline-layout device)
-  (let* ((descriptor-layout (create-descriptor-layout device))
+(define (create-pipeline-layout device descriptor-layout)
+  (let* ((descriptor-layout (or descriptor-layout
+			       (error "no descriptor layout" #f)))
 	 (layout-info
 	  (make-vk-pipeline-layout-create-info pipeline-layout-create-info 0 0
 					       1
@@ -271,13 +312,6 @@
     (vk-create-pipeline-layout device layout-info 0 layout)
     (cons layout descriptor-layout)))
 
-;; let's capture all the custom information that can be supplied in the pipeline in a record
-
-;; currently supported shaders
-(define-record-type shaders (fields vertex fragment))
-(define-record-type vertex-input-details (fields vertex-input-list stride attrs))
-(define-record-type pipeline-data (fields shaders vertex-input-details))
-
 (define vertex-input->details
   (lambda (input-metadata)
     (match input-metadata
@@ -286,11 +320,55 @@
 
 ;; render pass
 
-(define create-render-pass
-  (lambda (physical-device device swapchain)
+(define create-color-attachment-description
+  (lambda (format final-layout)
+    (make-vk-attachment-description 0
+				    format
+				    vk-sample-count-1-bit ;; samples
+				    vk-attachment-load-op-clear ;; load-op
+				    vk-attachment-store-op-store ;; store-op
+				    vk-attachment-load-op-dont-care ;;stencil-load-op
+				    vk-attachment-store-op-dont-care
+				    vk-image-layout-undefined
+				    final-layout)))
 
-    ;; defined as (~0U)
-    (define vk-subpass-external 0)
+(define create-color-attachment-reference
+  (lambda (final-layout) (make-vk-attachment-reference 0 final-layout)))
+
+(define create-subpass-description
+  (case-lambda
+   ((color-attachment-ref) (create-subpass-description color-attachment-ref #f))
+   ((color-attachment-ref depth-attachment-ref)
+    (make-vk-subpass-description 0
+				 vk-pipeline-bind-point-graphics
+				 0
+				 (null-pointer vk-attachment-reference)
+				 1
+				 color-attachment-ref
+				 (null-pointer vk-attachment-reference)
+				 (or depth-attachment-ref
+				    (null-pointer vk-attachment-reference))
+				 0
+				 (null-pointer unsigned-32)))))
+
+;; defined as (~0U)
+(define vk-subpass-external 0)
+
+(define create-render-pass
+  (lambda (device attachments subpasses dependencies)
+    (let ((info (make-vk-render-pass-create-info render-pass-create-info 0 0
+						 (array-pointer-length attachments)
+						 (array-pointer-raw-ptr attachments)
+						 (array-pointer-length subpasses)
+						 (array-pointer-raw-ptr subpasses)
+						 (array-pointer-length dependencies)
+						 (array-pointer-raw-ptr dependencies)))
+	  (render-pass (make-foreign-object vk-render-pass)))
+      (vk-create-render-pass device info 0 render-pass)
+      render-pass)))
+
+(define configure-render-pass
+  (lambda (physical-device device swapchain)
     
     (define create-render-pass-info
       (lambda ()
@@ -298,20 +376,12 @@
 		(vk-surface-format-khr-format (swapchain-format swapchain)))
 	       
 	       (color-attachment
-		(make-vk-attachment-description 0
-						swapchain-image-format
-						vk-sample-count-1-bit ;; samples
-						vk-attachment-load-op-clear ;; load-op
-						vk-attachment-store-op-store ;; store-op
-						vk-attachment-load-op-dont-care ;;stencil-load-op
-						vk-attachment-store-op-dont-care
-						vk-image-layout-undefined
-						vk-image-layout-present-src-khr))
+		(create-color-attachment-description swapchain-image-format
+						     vk-image-layout-present-src-khr))
 	       
-	       (color-attachment-ref
-		(make-vk-attachment-reference 0
-					      vk-image-layout-color-attachment-optimal))
-
+	       (color-attachment-ref (create-color-attachment-reference
+				      vk-image-layout-color-attachment-optimal))
+	       
 	       (depth-attachment
 		(make-vk-attachment-description 0
 						(find-depth-format physical-device)
@@ -330,17 +400,7 @@
 	       (attachments (list->vk-attachment-description-pointer-array
 			     (list color-attachment depth-attachment)))
 	       
-	       (subpass
-		(make-vk-subpass-description 0
-					     vk-pipeline-bind-point-graphics
-					     0
-					     (null-pointer vk-attachment-reference)
-					     1
-					     color-attachment-ref
-					     (null-pointer vk-attachment-reference)
-					     depth-attachment-ref
-					     0
-					     (null-pointer unsigned-32)))
+	       (subpass (create-subpass-description color-attachment-ref depth-attachment-ref))
 	       
 	       (dependency
 		(make-vk-subpass-dependency vk-subpass-external
@@ -371,25 +431,29 @@
   (fields handle layout render-pass descriptor-set-layout))
 
 (define create-depth-stencil-state
-  (lambda ()
-    (let ((zero-op-state (make-vk-stencil-op-state 0 0 0 0 0 0)))
-      (make-vk-pipeline-depth-stencil-state-create-info pipeline-depth-stencil-state-create-info
-							0
-							0
-							vk-true
-							vk-true
-							vk-compare-op-less
-							vk-false
-							vk-false
-							zero-op-state
-							zero-op-state
-							0.0
-							1.0))))
+  (lambda (depth-stencil)
+    (define bool->vulkan (lambda (x) (if x vk-true vk-false)))
+    
+    (match depth-stencil
+      (($ depth-stencil-state depth-test? depth-write? depth-compare-op)
+       (let ((zero-op-state (make-vk-stencil-op-state 0 0 0 0 0 0)))
+	 (make-vk-pipeline-depth-stencil-state-create-info pipeline-depth-stencil-state-create-info
+							   0
+							   0
+							   (bool->vulkan depth-test?)
+							   (bool->vulkan depth-write?)
+							   depth-compare-op
+							   vk-false
+							   vk-false
+							   zero-op-state
+							   zero-op-state
+							   0.0
+							   1.0))))))
 
 
 
 (define create-graphics-pipeline
-  (lambda (physical-device device swapchain pipeline-data)
+  (lambda (physical-device device pipeline-data)
     (let* ((shaders (pipeline-data-shaders pipeline-data))
 
 	   (shader-stages (list->vk-pipeline-shader-stage-create-info-pointer-array
@@ -399,9 +463,8 @@
 
 	   (vertex-input-data (pipeline-data-vertex-input-details pipeline-data))
 
-	   (render-pass (create-render-pass physical-device device swapchain))
-
-	   (layout (create-pipeline-layout device))
+	   (render-pass (pipeline-data-render-pass pipeline-data))
+	   (layout (create-pipeline-layout device (pipeline-data-descriptor-layout pipeline-data)))
 
 	   (pipeline-info
 	    (make-vk-graphics-pipeline-create-info
@@ -421,16 +484,16 @@
 	     (null-pointer vk-pipeline-tessellation-state-create-info)
 
 	     ;; viewport
-	     (create-viewport-info (swapchain-extent swapchain))
+	     (create-viewport-info (pipeline-data-viewport pipeline-data))
 
 	     ;; rasterizer
-	     (create-rasterizer-info)
+	     (create-rasterizer-info (pipeline-data-rasterization-state pipeline-data))
 
 	     ;; multisampling
 	     (create-multisampling-info)
 
 	     ;; depth stencil
-	     (create-depth-stencil-state)
+	     (create-depth-stencil-state (pipeline-data-depth-stencil-state pipeline-data))
 	     
 	     (create-color-blending-info)
 

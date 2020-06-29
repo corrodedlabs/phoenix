@@ -32,7 +32,8 @@
   (define vector->list
     (lambda (vector)
       (match vector
-	(($ vector4 x y z w) (list x y z w)))))
+	(($ vector4 x y z w) (list x y z w))
+	(($ vector3 x y z)   (list x y z)))))
 
   (define matrix->list
     (lambda (matrix)
@@ -149,15 +150,15 @@
 		    (make-vector4 0.0 0.0 1.0 0.0)
 		    (make-vector4 0.0 0.0 0.0 1.0))))
 
-  (define test-matrix  (make-matrix4 (make-vector4 1 2 3 4)
-  				     (make-vector4 1 2 3 4)
-  				     (make-vector4 1 2 3 4)
-  				     (make-vector4 1 2 3 4)))
+  (define test-matrix  (make-matrix4 (make-vector4 1.0 2.0 3.0 4.0)
+  				     (make-vector4 1.0 2.0 3.0 4.0)
+  				     (make-vector4 1.0 2.0 3.0 4.0)
+  				     (make-vector4 1.0 2.0 3.0 4.0)))
 
-  ;; (define matrix4-identity (make-matrix4 (make-vector4 1 0 0 0)
-  ;; 					 (make-vector4 0 1 0 0)
-  ;; 					 (make-vector4 0 0 1 0)
-  ;; 					 (make-vector4 0 0 0 1)))
+  (define matrix4-identity (make-matrix4 (make-vector4 1 0 0 0)
+  					 (make-vector4 0 1 0 0)
+  					 (make-vector4 0 0 1 0)
+  					 (make-vector4 0 0 0 1)))
 
   ;; (display-matrix test-matrix)
   
@@ -293,8 +294,9 @@
   (define mvp-matrix->list
     (lambda (mvp-matrix-obj)
       (match mvp-matrix-obj
-	(($ mvp-matrix model view projection)
-	 (apply append (map matrix->list (list model view projection)))))))
+	(($ mvp-matrix model view projection eye)
+	 (append (apply append (map matrix->list (list model view projection)))
+		 (vector->list eye))))))
 
   (define up (make-vector3 0.0 1.0 0.0))
 
@@ -369,13 +371,10 @@
 
       (match current-matrix
 	(($ mvp-matrix model view projection eye center)
-	 (let ((eye (car (update-eye-center eye-position center))))
-	   (let ((view (update-view-matrix eye camera-rotation)))
-	     (cons (make-mvp-matrix model
-				    view
-				    projection
-				    eye
-				    center) eye))))))))
+	 (let* ((eye (car (update-eye-center eye-position center)))
+		(view (update-view-matrix eye camera-rotation)))
+	   (cons (make-mvp-matrix model view projection eye center)
+		 eye)))))))
 
 
 #|

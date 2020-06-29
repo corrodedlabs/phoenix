@@ -27,6 +27,7 @@
 	  array-pointer-raw-ptr
 	  array-pointer-empty?
 	  array-pointer?
+	  new-array-pointer
 	  with-new-array-pointer
 	  pointer-ref-value
 	  pointer-ref-ftype
@@ -34,9 +35,9 @@
 	  double-pointer->list)
 
   (import (chezscheme)
-	  (prelude))
+	  	  (prelude))
 
-  (define libc (load-shared-object "libc.so.6"))
+  (define libc (load-shared-library (make-library-detail #f "libc.so.6" "msvcrt.dll")))
 
   (define memcpy
     (foreign-procedure "memcpy" (uptr uptr size_t) void))
@@ -150,7 +151,11 @@
 			   strs)))))))))
 
   
-  (define strdup (foreign-procedure "strdup" (string) string))
+  (define strdup 
+	(let ((proc-name (cond 
+					 	((foreign-entry? "strdup") "strdup")
+						((foreign-entry? "_strdup") "_strdup"))))
+	  (foreign-procedure proc-name (string) string)))
 
   (define-syntax write-cstring
     (syntax-rules ()
@@ -177,8 +182,11 @@
 
   (define-syntax make-foreign-array
     (syntax-rules ()
-      ((_ struct size) (make-ftype-pointer struct (unbox (malloc (* size
-								    (ftype-sizeof struct))))))))
+      ((_ struct size) (make-ftype-pointer struct
+					   (if (equal? size 0)
+					       0
+					       (unbox (malloc (* size
+								 (ftype-sizeof struct)))))))))
 
   (define-syntax pointer-ref-value
     (syntax-rules ()
@@ -234,6 +242,15 @@
 
   (define-record-type array-pointer (fields length raw-ptr type) (nongenerative))
 
+
+  (define-syntax new-array-pointer
+    (syntax-rules ()
+      ((_ pointer-type count)
+       (make-array-pointer count
+			   (make-foreign-array pointer-type count)
+			   pointer-type))))
+
+  ;; notice: this should not be here belongs somewhere inside vulkan library
   ;; this function covers a general pattern for vulkan functions to return an array
   ;; the f provided will be called two times:
   ;; once for the value of count and then
@@ -282,10 +299,10 @@
 
 		      (else (lp (fx+ 1 i)
 				(cons (and (array-pointer-raw-ptr arr-ptr)
-					 (f (ftype-&ref pointer-type
-							()
-							(array-pointer-raw-ptr arr-ptr)
-							i)))
+					   (f (ftype-&ref pointer-type
+							  ()
+							  (array-pointer-raw-ptr arr-ptr)
+							  i)))
 				      xs)))))))
 
 	       (define find-lambda
