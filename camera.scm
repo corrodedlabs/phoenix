@@ -19,11 +19,11 @@
   ;; (define make-vec3 (foreign-procedure "vec3" (float float float) vec3))
   ;; (define look_at (foreign-procedure "look_at" (vec3 vec3 vec3) mat4))
 
-  (define-record-type point3 (fields x y z))
-  (define-record-type vector3 (fields x y z))
+  (define-record-type point3  (nongenerative) (fields x y z))
+  (define-record-type vector3   (nongenerative) (fields x y z))
 
-  (define-record-type vector4 (fields x y z w))
-  (define-record-type matrix4 (fields x y z w))
+  (define-record-type vector4   (nongenerative) (fields x y z w))
+  (define-record-type matrix4   (nongenerative) (fields x y z w))
 
   (define constant-vector4
     (lambda (constant)
@@ -288,7 +288,7 @@
 		      (make-vector4 zero    zero    (/ (fl- (fl* 2.0 near far)) (fl- far near)) zero)))))
 
 
-  (define-record-type mvp-matrix (fields model view projection eye look-at-direction))
+  (define-record-type mvp-matrix   (nongenerative) (fields model view projection eye look-at-direction))
 
   (define mvp-matrix->list
     (lambda (mvp-matrix-obj)

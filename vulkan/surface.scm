@@ -1,9 +1,11 @@
 ;; depends on
 ;; * glfw submodule https://github.com/chenguangqi/glfw
 
-(define-record-type window-details (fields window surface))
+(define-record-type window-details (nongenerative) (fields window surface))
 
-(define-record-type dimension (fields width height))
+(define-record-type dimension
+  (nongenerative)
+  (fields width height))
 
 (define create-surface
   (lambda (instance window)

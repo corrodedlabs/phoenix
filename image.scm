@@ -8,7 +8,7 @@
   (import (scheme)
 	  (ffi))
 
-  (define o (load-shared-object "../phoenix-libs/libstb_image.so"))
+  (define o (load-shared-object "phoenix-libs/libstb_image.so"))
 
   (define-enum-ftype desired-channels
     stbi-default stbi-grey stbi-grey-alpha stbi-rgb stbi-rgb-alpha)

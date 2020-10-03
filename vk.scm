@@ -16,7 +16,7 @@
 	;; (renderdoc)
 
 	(srfi s43 vectors)
-	
+
 	(vulkan structure-types)
 	(matchable))
 

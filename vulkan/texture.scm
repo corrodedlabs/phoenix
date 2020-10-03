@@ -1,13 +1,12 @@
-
-(define texture-path "textures/udejafqg_2K_Albedo.jpg")
+(define texture-path "textures/winter.jpeg")
 
 ;; (define swapchain (vulkan-state-swapchain vs))
 
-(define-record-type texture-data (fields image-view sampler))
+(define-record-type texture-data  (nongenerative) (fields image-view sampler))
 
 (define create-texture-data
   (lambda (physical-device device command-pool graphics-queue swapchain)
-    
+
     (define create-texture-sampler
       (lambda (device)
 	(let ((info (make-vk-sampler-create-info sampler-create-info
@@ -40,4 +39,5 @@
 					       swapchain
 					       texture-path))
 	  (sampler (create-texture-sampler device)))
+      (displayln "creating texture data")
       (make-texture-data (gpu-image-view texture-image) sampler))))

@@ -9,6 +9,7 @@
 ;; we will synchronise the gpu flow using semaphores and fences
 ;; this record captures the synchronization objects
 (define-record-type sync-object
+  (nongenerative)
   (fields image-available-semaphore
 	  render-finished-semaphore
 	  in-flight-fence))
@@ -34,7 +35,7 @@
 ;; timeout in nanosecs
 (define +timeout+ #xFFFFFFFFFFFFFFFF)
 
-(define-record-type frame-state (fields current-frame images-in-flight))
+(define-record-type frame-state  (nongenerative) (fields current-frame images-in-flight))
 
 (define make-present-info
   (lambda (swapchain signal-semaphore image-index-ptr)

@@ -17,7 +17,6 @@
 	  (camera)
 	  (image)
 	  (matchable)
-	  
 	  (vulkan structure-types))
 
   (define v (load-shared-object "libvulkan.so.1"))
@@ -41,6 +40,7 @@
   (include "vulkan/sync.scm")
 
   (define-record-type vulkan-state
+    (nongenerative)
     (fields window surface physical-device queue-index device queues swapchain))
 
   (define setup-vulkan
@@ -132,14 +132,14 @@
 							components))))))
 
   (define sync-objects (lambda (device) (init-sync-objects device)))
-  
+
   (define initial-state
     (lambda (cmd-buffers)
       (make-frame-state 1
 			(list->vector (map (lambda (_) #f)
 					   (iota (array-pointer-length cmd-buffers)))))))
 
-  
+
   (define run-draw-loop
     (lambda (state uniform-buffers command-buffers)
       (match state

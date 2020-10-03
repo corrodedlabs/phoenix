@@ -1217,7 +1217,7 @@
 
 ;; offset cons cell (x . y)
 ;; extent cons cell (width . height)
-(define-record-type render-area (fields offset extent))
+(define-record-type render-area   (nongenerative) (fields offset extent))
 
 (define make-vk-render-pass-begin-info
   (lambda (render-pass framebuffer render-area clear-values)

@@ -202,7 +202,7 @@
 
 ;; load library
 
-(define o (load-shared-object "libassimp.so.5.0.0"))
+(define o (load-shared-object "libassimp.so"))
 
 ;; define native functions
 
@@ -218,7 +218,9 @@
 
 
 ;; record to collect vertex buffer data
-(define-record-type vertex-buffer-data (fields vertices normals uv colors))
+(define-record-type vertex-buffer-data
+  (nongenerative)
+  (fields vertices normals uv colors))
 
 (define (mesh-ptr->vertex-buffer-data mesh-ptr)
   (let* ((num-vertices (mesh-num-vertices mesh-ptr))
@@ -268,6 +270,7 @@
 
 ;; record to collect the data required from assimp
 (define-record-type model-data
+  (nongenerative)
   ;; vertex-data: contains data recorded per vertex type record<vertex-buffer-data>
   ;; indices: list containing indices from the mesh
   (fields vertex-data indices))

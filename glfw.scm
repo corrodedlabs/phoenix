@@ -20,7 +20,7 @@
 
   (define glfw-init (foreign-procedure "glfwInit" () boolean))
 
-  (define-record-type window (fields handle surface))
+  (define-record-type window   (nongenerative) (fields handle surface))
 
   ;; create glfw window also initializes glfw
   (define new-window
@@ -129,7 +129,7 @@
   ;; record to capture the direction of movement
   ;; all the fields are boolean
   ;; this record will be enriched as and when we need to capture different commands
-  (define-record-type movement-data (fields forward back right left))
+  (define-record-type movement-data   (nongenerative) (fields forward back right left))
 
   (define get-movement-direction
     (lambda (window)

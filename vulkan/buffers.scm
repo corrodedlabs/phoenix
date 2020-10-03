@@ -210,7 +210,9 @@
 
 ;; functions to work with gpu buffers
 
-(define-record-type buffer (fields handle memory size))
+(define-record-type buffer
+  (nongenerative)
+  (fields handle memory size))
 
 
 ;; Modes for creating a new buffer
@@ -297,7 +299,9 @@
 
 ;; record to represent a chunk of heap data which can be copied over to gpu blocks
 ;; using vkMapMemory and memcpy
-(define-record-type heap-data (fields pointer size))
+(define-record-type heap-data
+  (nongenerative)
+  (fields pointer size))
 
 
 ;; copy data from cpu to gpu host local memory
@@ -396,7 +400,9 @@
 
 ;; Uniform buffers
 
-(define-record-type uniform-buffer-data (fields model view projection))
+(define-record-type uniform-buffer-data
+  (nongenerative)
+  (fields model view projection))
 
 (define (uniform-buffer-data->list data) (mvp-matrix->list data))
 

@@ -42,6 +42,7 @@
 
 ;; Image Properties required to create a image
 (define-record-type image-properties
+  (nongenerative)
   (fields width height format usage-flags aspect-flags))
 
 (define create-image-handle
@@ -118,6 +119,7 @@
 ;; uses command buffers to move images to different stages
 
 (define-record-type transition-barrier-info
+  (nongenerative)
   (fields src-access-mask src-stage dst-access-mask dst-stage))
 
 ;; returns barrier info for performing the transition from 'old-layout' to 'new-layout'
@@ -239,7 +241,9 @@
 	 image-view)))))
 
 ;; record to represent an image in a gpu
-(define-record-type gpu-image (fields handle view memory))
+(define-record-type gpu-image
+  (nongenerative)
+  (fields handle view memory))
 
 (define find-depth-format
   (lambda (physical-device)

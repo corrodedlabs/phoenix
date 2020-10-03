@@ -35,14 +35,19 @@
 ;; vertex input
 
 ;; this will contain data about mesh component in a model
-(define-record-type mesh-component (fields index-count index-base))
+(define-record-type mesh-component
+  (nongenerative)
+  (fields index-count index-base))
 
 ;; components is a array of #<mesh-component>
 (define-record-type vertex-input-metadata
+  (nongenerative)
   (fields size vertices-list stride indices attrs components))
 
 ;; default vertex input struct
-(define-record-type vertex-input (fields position color texture-coord))
+(define-record-type vertex-input
+  (nongenerative)
+  (fields position color texture-coord))
 
 ;; takes input a nested list and returns a list of cons cell (format . offset)
 ;; these are usually saved in the field attrs of vertex-input-metadata
@@ -274,9 +279,15 @@
 ;; let's capture all the custom information that can be supplied in the pipeline in a record
 
 ;; currently supported shaders
-(define-record-type shaders (fields vertex fragment))
-(define-record-type vertex-input-details (fields vertex-input-list stride attrs))
-(define-record-type pipeline-data (fields shaders vertex-input-details))
+(define-record-type shaders
+  (nongenerative)
+  (fields vertex fragment))
+(define-record-type vertex-input-details
+  (nongenerative)
+  (fields vertex-input-list stride attrs))
+(define-record-type pipeline-data
+  (nongenerative)
+  (fields shaders vertex-input-details))
 
 (define vertex-input->details
   (lambda (input-metadata)
@@ -291,12 +302,12 @@
 
     ;; defined as (~0U)
     (define vk-subpass-external 0)
-    
+
     (define create-render-pass-info
       (lambda ()
 	(let* ((swapchain-image-format
 		(vk-surface-format-khr-format (swapchain-format swapchain)))
-	       
+
 	       (color-attachment
 		(make-vk-attachment-description 0
 						swapchain-image-format
@@ -307,7 +318,7 @@
 						vk-attachment-store-op-dont-care
 						vk-image-layout-undefined
 						vk-image-layout-present-src-khr))
-	       
+
 	       (color-attachment-ref
 		(make-vk-attachment-reference 0
 					      vk-image-layout-color-attachment-optimal))
@@ -329,7 +340,7 @@
 
 	       (attachments (list->vk-attachment-description-pointer-array
 			     (list color-attachment depth-attachment)))
-	       
+
 	       (subpass
 		(make-vk-subpass-description 0
 					     vk-pipeline-bind-point-graphics
@@ -341,18 +352,16 @@
 					     depth-attachment-ref
 					     0
 					     (null-pointer unsigned-32)))
-	       
+
 	       (dependency
 		(make-vk-subpass-dependency vk-subpass-external
 					    0
 					    vk-pipeline-stage-color-attachment-output-bit
 					    vk-pipeline-stage-color-attachment-output-bit
 					    0
-					    (bitwise-ior
-					     vk-access-color-attachment-read-bit
-					     vk-access-color-attachment-write-bit)
-					    0)))
-	  
+					    vk-access-color-attachment-write-bit
+					    vk-dependency-by-region-bit)))
+
 	  (make-vk-render-pass-create-info render-pass-create-info 0 0
 					   (array-pointer-length attachments)
 					   (array-pointer-raw-ptr attachments)
@@ -360,7 +369,6 @@
 					   subpass
 					   1
 					   dependency))))
-
     (let ((info (create-render-pass-info))
 	  (render-pass (make-foreign-object vk-render-pass)))
       (vk-create-render-pass device info 0 render-pass)
@@ -368,6 +376,7 @@
 
 ;; record to save the pipeline information
 (define-record-type pipeline
+  (nongenerative)
   (fields handle layout render-pass descriptor-set-layout))
 
 (define create-depth-stencil-state

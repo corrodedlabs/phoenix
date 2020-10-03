@@ -1,5 +1,6 @@
 
 (define-record-type swapchain-details
+  (nongenerative)
   (fields surface-format
 	  present-mode
 	  extent
@@ -165,6 +166,7 @@
 ;; this struct will be available in the vulkan state and can be used at any stage to
 ;; refer to the contents of swapchain or apply relevant functions
 (define-record-type swapchain
+  (nongenerative)
   (fields handle images image-views format extent))
 
 (define (create-swapchain physical-device device surface queue-index)
