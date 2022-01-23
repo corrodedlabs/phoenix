@@ -6,38 +6,38 @@
 	(vulkan)
 	(matchable))
 
-(define (print-stack-trace e)
+;; (define (print-stack-trace e)
 
-  (define (get-func c)
-    (let ((cc ((c 'code) 'name)))
-      (if cc cc "--main--")))
+;;   (define (get-func c)
+;;     (let ((cc ((c 'code) 'name)))
+;;       (if cc cc "--main--")))
 
-  (display-condition e) (newline)
+;;   (display-condition e) (newline)
 
-  (let p ((t (inspect/object (condition-continuation e))))
-    (call/cc
-     (lambda (ret)
-       (if (> (t 'depth) 1)
-           (begin
-	     (call-with-values
-		 (lambda () (t 'source-path))
-	       (case-lambda
-		((file line column)
-		 (printf "\tat ~a (~a:~a,~a)\n" (get-func t) file line column))
-		(else (ret))))
-	     (p (t 'link)))))))
-  (exit))
+;;   (let p ((t (inspect/object (condition-continuation e))))
+;;     (call/cc
+;;      (lambda (ret)
+;;        (if (> (t 'depth) 1)
+;;            (begin
+;; 	     (call-with-values
+;; 		 (lambda () (t 'source-path))
+;; 	       (case-lambda
+;; 		((file line column)
+;; 		 (printf "\tat ~a (~a:~a,~a)\n" (get-func t) file line column))
+;; 		(else (ret))))
+;; 	     (p (t 'link)))))))
+;;   (exit))
 
-(base-exception-handler print-stack-trace)
+;; (base-exception-handler print-stack-trace)
 
 
 (define state (setup-vulkan))
 
-(define shaders (make-shaders "shaders/simple.vert" "shaders/simple.frag"))
+(define shaders (make-shaders "shaders/shader.vert" "shaders/shader.frag"))
 
-(define p (create-pipeline state
-			   shaders
-			   "models/box.obj"))
+(define p (create-pipeline-from-model state
+				      shaders
+				      "models/cube.obj"))
 
 (define vertex-input-metadata (car p))
 (define pipeline (cdr p))

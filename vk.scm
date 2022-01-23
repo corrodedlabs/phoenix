@@ -59,9 +59,9 @@
 (load "vulkan/texture.scm")
 (load "vulkan/buffers.scm")
 
-;; (start-frame-capture)
+;; ;; (start-frame-capture)
 
-(load "vulkan/sync.scm")
+;; (load "vulkan/sync.scm")
 
 (define window (window-details-window (vulkan-state-window vs)))
 (start-loop)

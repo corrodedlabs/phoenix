@@ -4,6 +4,7 @@
   (export setup-vulkan
 	  make-shaders
 	  create-pipeline
+	  create-pipeline-from-model
 	  create-buffers
 	  run-draw-loop)
 
@@ -59,15 +60,25 @@
 
   ;; returns a cons cell of (vertex-input-metadata . graphics-pipeline)
   (define create-pipeline
-    (lambda (state shaders model-filename)
+    (lambda (state shaders vertex-input-metadata)
       (match-let (((@ vulkan-state (physical-device physical-device)
 				   (device device)
 				   (swapchain swapchain)) state))
-	(let* ((vertex-input-metadata (model->vertex-input-metadata model-filename))
-	       (pipeline-data (make-pipeline-data shaders
-						  (vertex-input->details vertex-input-metadata))))
-	  (cons vertex-input-metadata
-		(create-graphics-pipeline physical-device device swapchain pipeline-data))))))
+	(cons vertex-input-metadata
+	      (create-graphics-pipeline
+	       physical-device
+	       device
+	       swapchain
+	       (make-pipeline-data shaders
+				   (vertex-input->details
+				    vertex-input-metadata)))))))
+
+  ;; returns a cons cell of (vertex-input-metadata . graphics-pipeline)
+  (define create-pipeline-from-model
+    (lambda (state shaders model-filename)
+      (create-pipeline state
+		       shaders
+		       (model->vertex-input-metadata model-filename))))
 
   ;; returns a cons cell of (uniform-buffers . command-buffers)
   (define create-buffers
@@ -77,27 +88,35 @@
 				    (swapchain swapchain-obj)
 				    (queue-index queue-index)
 				    (queues queues)) state)
+
 		   ((@ vertex-input-metadata (vertices-list vertices)
 					     (indices indices)
-					     (components components)) vertex-input-metadata-obj)
+					     (components components))
+		    vertex-input-metadata-obj)
+
 		   ((@ swapchain (image-views swapchain-image-views)
 				 (extent extent)) swapchain-obj)
+
 		   ((graphics-queue . present-queue) queues))
 	(displayln "indices length " (length indices)
 		   "vertices length" (length vertices))
 	(let* ((command-pool (create-command-pool device queue-index))
-	       (vertex-buffer (create-gpu-local-buffer physical-device
-						       device
-						       graphics-queue
-						       command-pool
-						       vertices
-						       vk-buffer-usage-vertex-buffer-bit))
-	       (index-buffer (create-gpu-local-buffer physical-device
-						      device
-						      graphics-queue
-						      command-pool
-						      indices
-						      vk-buffer-usage-index-buffer-bit))
+
+	       (vertex-buffer
+		(create-gpu-local-buffer physical-device
+					 device
+					 graphics-queue
+					 command-pool
+					 vertices
+					 vk-buffer-usage-vertex-buffer-bit))
+
+	       (index-buffer
+		(create-gpu-local-buffer physical-device
+					 device
+					 graphics-queue
+					 command-pool
+					 indices
+					 vk-buffer-usage-index-buffer-bit))
 	       (framebuffers (create-framebuffers physical-device
 						  device
 						  command-pool
@@ -105,21 +124,27 @@
 						  swapchain-obj
 						  pipeline))
 	       (framebuffer-size (length framebuffers))
-	       (uniform-buffers (create-uniform-buffers physical-device
-							device
-							(extent->uniform-buffer-data extent)
-							framebuffer-size))
+
+	       (uniform-buffers
+		(create-uniform-buffers physical-device
+					device
+					(extent->uniform-buffer-data extent)
+					framebuffer-size))
+
 	       (texture-data (create-texture-data physical-device
 						  device
 						  command-pool
 						  graphics-queue
 						  swapchain-obj))
-	       (descriptor-sets (create-descriptor-sets device
-							(create-descriptor-pool device
-										framebuffer-size)
-							(pipeline-descriptor-set-layout pipeline)
-							uniform-buffers
-							texture-data)))
+
+	       (descriptor-sets
+		(create-descriptor-sets device
+					(create-descriptor-pool
+					 device framebuffer-size)
+					(pipeline-descriptor-set-layout
+					 pipeline)
+					uniform-buffers
+					texture-data)))
 	  (cons uniform-buffers (create-command-buffers device
 							swapchain-obj
 							command-pool

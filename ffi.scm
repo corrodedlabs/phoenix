@@ -72,8 +72,7 @@
 	(let ((ch (foreign-ref 'char ptr i)))
 	  (cond
 	   ((char=? ch #\nul) (list->string (reverse chs)))
-	   (else (loop (+ i 1)
-		       (cons ch chs))))))))
+	   (else (loop (+ i 1) (cons ch chs))))))))
 
   (define string->ptr
     (case-lambda
@@ -282,10 +281,10 @@
 
 		      (else (lp (fx+ 1 i)
 				(cons (and (array-pointer-raw-ptr arr-ptr)
-					 (f (ftype-&ref pointer-type
-							()
-							(array-pointer-raw-ptr arr-ptr)
-							i)))
+					   (f (ftype-&ref pointer-type
+							  ()
+							  (array-pointer-raw-ptr arr-ptr)
+							  i)))
 				      xs)))))))
 
 	       (define find-lambda

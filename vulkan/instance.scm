@@ -84,13 +84,15 @@
   ;;todo should strings->ptr just return the address instead of pointer?
   (define get-required-extensions
     (lambda ()
-      (let ((glfw-extensions-info ((lambda ()
-				     (glfw-init)
-				     (glfw-get-required-instance-extensions)))))
+      (let ((glfw-extensions-info
+	     (begin
+	       (glfw-init)
+	       (glfw-get-required-instance-extensions))))
 	(cond
-	 (validation? (let ((extensions (append (ptr->strings glfw-extensions-info)
-						(list *validation-extension*))))
-			(cons (length extensions) (strings->ptr extensions))))
+	 (validation?
+	  (let ((extensions (append (ptr->strings glfw-extensions-info)
+				    (list *validation-extension*))))
+	    (cons (length extensions) (strings->ptr extensions))))
 	 (else glfw-extensions-info)))))
 
   
