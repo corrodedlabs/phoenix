@@ -34,6 +34,9 @@
       (match vector
 	(($ vector4 x y z w) (list x y z w)))))
 
+
+
+
   (define matrix->list
     (lambda (matrix)
       (match matrix
@@ -84,7 +87,10 @@
 		   (($ vector4 x1 y1 z1 w1)
 		    (match vec
 		      (($ vector4 x2 y2 z2 w2)
-		       (make-vector4 (fl+ x1 x2) (fl+ y1 y2) (fl+ z1 z2) (fl+ w1 w2))))))		 )
+		       (make-vector4 (fl+ x1 x2)
+				     (fl+ y1 y2)
+				     (fl+ z1 z2)
+				     (fl+ w1 w2)))))))
 	       (make-vector4 0.0 0.0 0.0 0.0)
 	       vectors))
 

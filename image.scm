@@ -16,7 +16,8 @@
   (define-ftype stbi-uc uptr)
 
   (define stbi_load
-    (foreign-procedure "stbi_load" (string (* int) (* int) (* int) desired-channels) stbi-uc))
+    (foreign-procedure "stbi_load"
+		       (string (* int) (* int) (* int) desired-channels) stbi-uc))
 
   ;; stbi_free is just free
   (define stbi_free (foreign-procedure "free" (stbi-uc) void))

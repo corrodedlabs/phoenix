@@ -61,9 +61,7 @@
 	(malloc-guardian x)
 	x)))
 
-
-  
-  (define-ftype cstring (* char)) 
+  (define-ftype cstring (* char))
 
   (define ptr->string
     (lambda (ptr)
