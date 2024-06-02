@@ -31,7 +31,8 @@
 	  pointer-ref-value
 	  pointer-ref-ftype
 
-	  double-pointer->list)
+	  double-pointer->list
+	  lambda->ffi-callback)
 
   (import (chezscheme)
 	  (prelude))
@@ -74,19 +75,19 @@
 
   (define string->ptr
     (case-lambda
-     [(str)
-      (string->ptr str (unbox (malloc (* (ftype-sizeof char)
-					 (string-length str)))) 0)]
-     [(str ptr)
-      (string->ptr str ptr 0)]
-     [(str ptr offset)
-      (let lp ((i offset))
-	(cond
-	 ((= i (+ (string-length str) offset))
-	  (foreign-set! 'char ptr i #\nul)
-	  ptr)
-	 (else (foreign-set! 'char ptr i (string-ref str (- i offset)))
-	       (lp (+ 1 i)))))]))
+      [(str)
+       (string->ptr str (unbox (malloc (* (ftype-sizeof char)
+					  (string-length str)))) 0)]
+      [(str ptr)
+       (string->ptr str ptr 0)]
+      [(str ptr offset)
+       (let lp ((i offset))
+	 (cond
+	  ((= i (+ (string-length str) offset))
+	   (foreign-set! 'char ptr i #\nul)
+	   ptr)
+	  (else (foreign-set! 'char ptr i (string-ref str (- i offset)))
+		(lp (+ 1 i)))))]))
 
   ;; (string->ptr "abcd")
 
@@ -132,19 +133,19 @@
 
   (define ptr->strings
     (case-lambda
-     ((ptr-info)
-      (ptr->strings (cdr ptr-info) (car ptr-info)))
-     ((ptr count)
-      (let ((ptr (cond
-		  ((ftype-pointer? ptr) ptr)
-		  (else (make-ftype-pointer uptr ptr)))))
-	(let lp ((i 0)
-		 (strs (list)))
-	  (cond
-	   ((= i count) (reverse strs))
-	   (else (lp (+ 1 i)
-		     (cons (ptr->string (ftype-ref uptr () ptr i))
-			   strs)))))))))
+      ((ptr-info)
+       (ptr->strings (cdr ptr-info) (car ptr-info)))
+      ((ptr count)
+       (let ((ptr (cond
+		   ((ftype-pointer? ptr) ptr)
+		   (else (make-ftype-pointer uptr ptr)))))
+	 (let lp ((i 0)
+		  (strs (list)))
+	   (cond
+	    ((= i count) (reverse strs))
+	    (else (lp (+ 1 i)
+		      (cons (ptr->string (ftype-ref uptr () ptr i))
+			    strs)))))))))
 
   
   (define strdup (foreign-procedure "strdup" (string) string))
@@ -389,13 +390,13 @@
 										#'type
 										"-"
 										#'field-name)))
-				     (cond
-				      ;; don't generate setter for nested array types
-				      ((array-type? (syntax->datum (cdr member-spec))) #f)
-				      (else #'(ftype-set! struct-name
-							  (name field-name)
-							  obj
-							  (field-getter val-expr))))))
+						 (cond
+						  ;; don't generate setter for nested array types
+						  ((array-type? (syntax->datum (cdr member-spec))) #f)
+						  (else #'(ftype-set! struct-name
+								      (name field-name)
+								      obj
+								      (field-getter val-expr))))))
 				 (cdr member-info))))
 
 		       ;; array type
@@ -411,15 +412,15 @@
 			     (name name)
 			     (val-expr val-expr)
 			     ((gen-setter ...) (gen-setter)))
-		(case (syntax->datum type)
-		  ((uptr)
-		   #'(cond
-		      ((string? val-expr)
-		       (write-cstring obj struct-name (name) val-expr))
+			    (case (syntax->datum type)
+			      ((uptr)
+			       #'(cond
+				  ((string? val-expr)
+				   (write-cstring obj struct-name (name) val-expr))
 
-		      (else gen-setter ...)))
-		  
-		  (else #'(begin gen-setter ...))))))
+				  (else gen-setter ...)))
+			      
+			      (else #'(begin gen-setter ...))))))
 	  
 	  
 	  (with-syntax ([struct-name struct-name]
@@ -435,7 +436,7 @@
 						(struct-set-syntax #'type
 								   #'name
 								   #'val-expr)))
-				  (cons #'(setter-syntax ...) #'val-expr)))
+					      (cons #'(setter-syntax ...) #'val-expr)))
 			      member-spec)])
 	    #'(lambda (val-exprs ...)
 		(let ((obj (make-foreign-object struct-name)))
@@ -457,57 +458,57 @@
 			     (lambda-&name
 			      (construct-name #'struct-name
 					      #'struct-name "-&" #'lambda-suffix)))
-		#'(begin
-		    (define-ptr-lambda lambda-name struct-name member-spec ftype-ref)
-		    (define-ptr-lambda lambda-&name struct-name member-spec ftype-&ref)))))
+			    #'(begin
+				(define-ptr-lambda lambda-name struct-name member-spec ftype-ref)
+				(define-ptr-lambda lambda-&name struct-name member-spec ftype-&ref)))))
 	  
 	  (with-syntax ((struct-name struct-name))
 	    (map (lambda (member)
 		   (with-syntax* ((name (car member))
 				  (type (cdr member)))
-		     (let* ((type-sym (syntax->datum #'type))
-			    (member-types (assoc type-sym member-details)))
-		       (cond
+				 (let* ((type-sym (syntax->datum #'type))
+					(member-types (assoc type-sym member-details)))
+				   (cond
 
-			;; getters for struct fields
-			;; only one level of nesting handled
-			(member-types
-			 (with-syntax*
-			     (((getters ...)
-			       (filter identity
-				       (map (lambda (member-spec)
-					      (with-syntax* ((field-name (datum->syntax
-									  #'name
-									  (car member-spec)))
-							     (suffix
-							      (construct-name #'struct-name
-									      #'name
-									      "-"
-									      #'field-name)))
-						(cond
-						 ((array-type? (cdr member-spec)) #f)
-						 (else 
-						  (construct-ptr-lambdas #'suffix
-									 (list #'name
-									       #'field-name))))))
-					    (cdr member-types)))))
-			   #'(begin getters ...)))
+				    ;; getters for struct fields
+				    ;; only one level of nesting handled
+				    (member-types
+				     (with-syntax*
+				      (((getters ...)
+					(filter identity
+						(map (lambda (member-spec)
+						       (with-syntax* ((field-name (datum->syntax
+										   #'name
+										   (car member-spec)))
+								      (suffix
+								       (construct-name #'struct-name
+										       #'name
+										       "-"
+										       #'field-name)))
+								     (cond
+								      ((array-type? (cdr member-spec)) #f)
+								      (else 
+								       (construct-ptr-lambdas #'suffix
+											      (list #'name
+												    #'field-name))))))
+						     (cdr member-types)))))
+				      #'(begin getters ...)))
 
-			;; array types
-			((array-type? type-sym)
-			 (with-syntax ((size (datum->syntax #'name (cadr type-sym)))
-				       (lambda-name (construct-name #'name
-								    #'struct-name "-" #'name)))
-			   #'(define lambda-name
-			       (lambda (ptr)
-				 (if (ftype-pointer? struct-name ptr)
-				     (map (lambda (i)
-					    (ftype-ref struct-name (name i) ptr))
-					  (iota size))
-				     (raise (ffi-condition "invalid pointer" ptr lambda-name)))))))
+				    ;; array types
+				    ((array-type? type-sym)
+				     (with-syntax ((size (datum->syntax #'name (cadr type-sym)))
+						   (lambda-name (construct-name #'name
+										#'struct-name "-" #'name)))
+				       #'(define lambda-name
+					   (lambda (ptr)
+					     (if (ftype-pointer? struct-name ptr)
+						 (map (lambda (i)
+							(ftype-ref struct-name (name i) ptr))
+						      (iota size))
+						 (raise (ffi-condition "invalid pointer" ptr lambda-name)))))))
 
-			;; scalar / pointer getters
-			(else (construct-ptr-lambdas #'name (list #'name)))))))
+				    ;; scalar / pointer getters
+				    (else (construct-ptr-lambdas #'name (list #'name)))))))
 		 member-spec))))
       
       (syntax-case stx ()
@@ -568,6 +569,13 @@
 	 #'(begin
 	     (define-ftype name int)
 	     (define e v) ...))]))
+
+  (define-syntax lambda->ffi-callback
+    (syntax-rules ()
+      ((_ f (<args> ...) <ret>)
+       (let ([code (foreign-callable f (<args> ...) <ret>)])
+	 (lock-object code)
+	 (foreign-callable-entry-point code)))))
 
   ;; configure gc
   ;; (collect-request-handler (lambda ()

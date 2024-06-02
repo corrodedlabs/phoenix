@@ -7,3 +7,6 @@
 [submodule "phoenix-libs"]
 	path = phoenix-libs
 	url = git@github.com:corrodedlabs/phoenix-libs.git
+[submodule "chez-gl"]
+	path = chez-gl
+	url = https://github.com/steven741/chez-gl/

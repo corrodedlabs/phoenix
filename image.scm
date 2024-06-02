@@ -19,6 +19,9 @@
     (foreign-procedure "stbi_load"
 		       (string (* int) (* int) (* int) desired-channels) stbi-uc))
 
+  (define stbi-set-flip-vertically-on-load
+    (foreign-procedure "stbi_set_flip_vertically_on_load" (boolean) void))
+
   ;; stbi_free is just free
   (define stbi_free (foreign-procedure "free" (stbi-uc) void))
 
@@ -33,6 +36,7 @@
 	      (let ((width (make-foreign-object int))
 		    (height (make-foreign-object int))
 		    (channels (make-foreign-object int)))
+		(stbi-set-flip-vertically-on-load #t)
 		(set! image
 		      (make-image-data (stbi_load image-path width height channels stbi-rgb-alpha)
 				       (read-int width)

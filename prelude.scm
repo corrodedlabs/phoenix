@@ -8,7 +8,8 @@
 	  kebab-case->camel-case
 	  interleave
 	  interpose
-	  mapcat)
+	  mapcat
+	  clamp-between)
 
   (import (chezscheme)
 	  (srfi s41 streams))
@@ -79,14 +80,22 @@
 	(cond
 	 ((null? c) (reverse (cdr res)))
 	 (else (loop (cdr c)
-		     (cons sep (cons (car c) res)))))))))
+		     (cons sep (cons (car c) res))))))))
+
+  (define clamp-between
+    (lambda (min-clamp num max-clamp)
+      (max min-clamp (min max-clamp num)))))
 
 #|
 ----------------------------------
 
+(load "./prelude.scm")
+(import (prelude))
+
 (define-syntax test
 (syntax-rules ()
 ((_ l r) (assert (equal? l r)))))
+
 (test (take 2 '(10 20 30 40)) '(10 20))
 (test (kebab-case->camel-case "vk-cmd-begin") "vkCmdBegin")
 (test (interleave '(1 2 3 4)

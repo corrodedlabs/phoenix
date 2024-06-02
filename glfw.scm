@@ -3,6 +3,7 @@
 	  glfw-get-required-instance-extensions
 	  create-window
 	  new-window
+	  new-opengl-window
 	  poll-events
 	  get-movement-direction
 	  movement-data
@@ -14,9 +15,10 @@
 
   (import (chezscheme)
 	  (ffi)
-	  (glfw glfw))
+	  (glfw glfw)
+	  (glfw constants))
 
-  ;; (define glfw (load-shared-object "libglfw.so"))
+  (define glfw (load-shared-object "libglfw.so"))
 
   (define glfw-init (foreign-procedure "glfwInit" () boolean))
 
@@ -27,6 +29,13 @@
     (lambda (width height)
       (glfwInit)
       (glfwWindowHint GLFW_CLIENT_API GLFW_NO_API)
+      (glfwWindowHint GLFW_RESIZABLE GLFW_FALSE)
+      (glfwCreateWindow width height "Phoenix" 0 0)))
+
+  (define new-opengl-window
+    (lambda (width height)
+      (glfwInit)
+      (glfwWindowHint GLFW_OPENGL_DEBUG_CONTEXT GLFW_TRUE)
       (glfwWindowHint GLFW_RESIZABLE GLFW_FALSE)
       (glfwCreateWindow width height "Phoenix" 0 0)))
 
